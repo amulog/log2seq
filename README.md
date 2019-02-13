@@ -40,9 +40,14 @@ To customize parsing rules, see log2seq/default_script.py .
 log2seq also allows rules written in configparser (see `log2seq.load_from_config` and `log2seq/data/sample.conf`).
 
 
+## Code
+The source code is available at https://github.com/cpflat/log2seq
+
+
 ## License
 3-Clause BSD license
 
 
 ## Author
 Satoru Kobayashi
+
