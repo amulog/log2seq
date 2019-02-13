@@ -5,6 +5,13 @@ from __future__ import print_function
 import os
 from setuptools import setup
 
+try:
+    from pypandoc import convert
+    read_md = lambda f: convert(f, 'rst')
+except ImportError:
+    print('pandoc is not installed.')
+    read_md = lambda f: open(f, 'r').read()
+
 package_name = 'log2seq'
 data_dir = "/".join((package_name, "data"))
 data_files = ["/".join((data_dir, fn)) for fn in os.listdir(data_dir)]
@@ -12,6 +19,7 @@ data_files = ["/".join((data_dir, fn)) for fn in os.listdir(data_dir)]
 setup(name=package_name,
       version='0.0.1',
       description='',
+      long_description=read_md('README.md'),
       author='Satoru Kobayashi',
       author_email='sat@nii.ac.jp',
       url='https://github.com/cpflat/log2seq/',
