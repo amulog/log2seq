@@ -11,6 +11,6 @@ if __name__ == "__main__":
 
     for mes in l_messages:
         print(mes)
-        dt, host, l_w, l_s = p.process_line(mes)
-        print("-> {0} {1} {2}".format(dt, host, l_w))
+        d = p.process_line(mes)
+        print("-> {0} {1} {2}".format(d["timestamp"], d["host"], d["words"]))
 

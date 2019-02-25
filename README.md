@@ -23,11 +23,11 @@ Following is a sample code:
 	mes = "Jan  1 12:34:56 host-device1 system[12345]: host 2001:0db8:1234::1 (interface:eth0) disconnected"
 
 	import log2seq
-	rules = log2seq.load_from_script("./parser.py")
+	rules = log2seq.load_from_script("./default_parser.py")
 	parser = log2seq.init_parser("rules")
 
-	dt, host, words, syms = parser.process_line(mes)
-	print(words)
+	d = parser.process_line(mes)
+	print(d["words"])
 
 It outputs following sequence.
 
@@ -35,9 +35,9 @@ It outputs following sequence.
 
 You can see `:` in ipv6 addr is left, and other `:` are ignored.
 
-To customize parsing rules, see log2seq/default_script.py .
+To customize parsing rules, see `log2seq/default_script.py` .
 
-log2seq also allows rules written in configparser (see `log2seq.load_from_config` and `log2seq/data/sample.conf`).
+log2seq also allows rules written in configparser (see `log2seq/data/sample.conf`).
 
 
 ## Code

@@ -5,30 +5,107 @@ import re
 import datetime
 import ipaddress
 
+KEY_TIMESTAMP = 'timestamp'
+KEY_MESSAGE = 'message'
+KEY_WORDS = 'words'
+KEY_SYMBOLS = 'symbols'
 KEY_FIX = 'fix'
 
 
-class Parser():
+class TimestampParser(object):
 
     month_name = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    numeric_tz = re.compile(r"^[+-]\d{2}:\d{2}(:\d+)?$")
 
-    def __init__(self, rules, default_year = None):
-        self._header_rules, self._split_rules = rules
-        self.default_year = default_year
-
-    def _set_year(self):
-        if self.default_year is None:
-            return datetime.datetime.today().year
-        else:
-            return int(self.default_year)
+    def __init__(self, defaults):
+        self._defaults = defaults
 
     @classmethod
     def _str2month(cls, string):
-        if not string in cls.month_name:
-            return None
-        else:
+        if len(string) == 2:
+            return int(string)
+        elif len(string) == 3:
             return cls.month_name.index(string) + 1
+        else:
+            return None
+
+    @classmethod
+    def _str2tz(cls, string):
+        # referring official _strptime.py (v3.7.2)
+        z = string.lower()
+        if cls.numeric_tz.match(z):
+            if z[3] == ':':
+                z = z[:3] + z[4:]
+                if len(z) > 5:
+                    if z[5] != ':':
+                        raise ValueError
+                    z = z[:5] + z[6:]
+            hours = int(z[1:3])
+            minutes = int(z[3:5])
+            seconds = int(z[5:7] or 0)
+            gmtoff = (hours * 60 * 60) + (minutes * 60) + seconds
+            gmtoff_remainder = z[8:]
+            gmtoff_remainder_padding = "0" * (6 - len(gmtoff_remainder))
+            gmtoff_fraction = int(gmtoff_remainder + gmtoff_remainder_padding)
+            if z.startswith("-"):
+                gmtoff = -gmtoff
+                gmtoff_fraction = -gmtoff_fraction
+            tzdelta = datetime_timedelta(seconds = gmtoff,
+                                         microseconds = gmtoff_fraction)
+            return datetime.timezone(tzdelta)
+        else:
+            if z in ("utc", "gmt"):
+                return datetime.timezone.utc
+            else:
+                # use local time
+                return None
+
+    def parse(self, d):
+
+        def _get(groupdict, key):
+            if not key in groupdict or groupdict[key] is None:
+                if key in self._defaults:
+                    return self._defaults[key]
+                else:
+                    return None
+            else:
+                return groupdict[key]
+
+        kwargs = {k: int(_get(d, k))
+                  for k in ('day', 'hour', 'minute', 'second')}
+
+        year = _get(d, 'year')
+        if year is None:
+            year = datetime.datetime.today().year
+        kwargs['year'] = int(year)
+
+        month = _get(d, 'month')
+        kwargs['month'] = self._str2month(month)
+
+        ms = _get(d, 'microsecond')
+        if ms is not None:
+            kwargs['microsecond'] = int(ms)
+
+        tzstr = _get(d, 'tz')
+        if tzstr is not None:
+            tz = self._str2tz(tzstr)
+            if tz is not None: # not local time
+                kwargs['tzinfo'] = tz
+
+        try:
+            return datetime.datetime(**kwargs)
+        except:
+            msg = "parsing timestamp failed: {0}".format(kwargs)
+            raise SyntaxError(msg)
+
+
+class LogParser():
+
+    def __init__(self, rules, defaults = dict(),
+                 timestamp_parser = TimestampParser):
+        self._header_rules, self._split_rules = rules
+        self._tp = timestamp_parser(defaults)
 
     @staticmethod
     def _is_ip(string, ipaddr = True, ipnet = True):
@@ -58,29 +135,11 @@ class Parser():
                 d = m.groupdict()
                 break
         else:
-            raise SyntaxError(
-                "Parsing log header failed: {0}".format(line))
+            msg = "parsing log header failed: {0}".format(line)
+            raise SyntaxError(msg)
 
-        if d['year'] is None:
-            year = self._set_year()
-        else:
-            year = d['year']
-        if 'month' in d:
-            month = d['month']
-        elif 'bmonth' in d:
-            month = self._str2month(d['bmonth'])
-        else:
-            raise SyntaxError("No month or bmonth in header_regex")
-
-        dt = datetime.datetime(year = int(year), month = int(month),
-                               day = int(d['day']),
-                               hour = int(d['hour']),
-                               minute = int(d['minute']),
-                               second = int(d['second']),
-                               microsecond = 0)
-        host = d['host']
-        message = d['message']
-        return dt, host, message
+        d[KEY_TIMESTAMP] = self._tp.parse(d)
+        return d
 
     def process_message(self, mes):
 
@@ -183,19 +242,21 @@ class Parser():
         return l_w, l_s
 
     def process_line(self, line):
-        line = line.rstrip("\n")
+        line = line.rstrip()
         if line == "":
-            return None, None, None, None
-        dt, host, message = self.process_header(line)
-        if message is None or message == "":
-            return None, None, None, None
-        l_w, l_s = self.process_message(message)
-        return dt, host, l_w, l_s
+            return None
+        d = self.process_header(line)
+        mes = d[KEY_MESSAGE]
+        if mes:
+            l_w, l_s = self.process_message(mes)
+            d[KEY_WORDS] = l_w
+            d[KEY_SYMBOLS] = l_s
+        return d
 
 
-def init_parser(rules = None):
+def init_parser(rules = None, defaults = dict()):
     if rules is None:
         from . import default_script
         rules = (default_script.header_rules, default_script.split_rules)
-    return Parser(rules)
+    return LogParser(rules, defaults)
 
