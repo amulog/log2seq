@@ -242,7 +242,7 @@ class LogParser():
         return l_w, l_s
 
     def process_line(self, line):
-        line = line.rstrip()
+        line = line.rstrip("\n")
         if line == "":
             return None
         d = self.process_header(line)
