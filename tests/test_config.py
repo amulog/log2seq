@@ -8,8 +8,9 @@ import message
 l_messages = message.messages
 
 if __name__ == "__main__":
-    rules = log2seq.load_from_config(
-        os.path.abspath("../log2seq/data/sample.conf"))
+    place = os.path.dirname(__file__) or "."
+    place += "/../log2seq/data/sample.conf"
+    rules = log2seq.load_from_config(place)
     p = log2seq.LogParser(rules)
 
     for mes in l_messages:
