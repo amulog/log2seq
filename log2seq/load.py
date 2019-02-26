@@ -2,8 +2,17 @@
 # coding: utf-8
 
 
-
 def load_from_script(fp):
+    """Load external python script that gives log2seq rules.
+    You can copy default_script.py, and extend it.
+    Then this function can load the extended script by its file path.
+    
+    Args:
+        fp (str): file path of external python script.
+        
+    Retruns:
+        rules (tuple): a tuple of header_rules and split_rules.
+    """
 
     import os.path
     import sys
@@ -17,6 +26,18 @@ def load_from_script(fp):
 
 
 def load_from_config(fp):
+    """Load log2seq rules from configparser text file.
+    It basically follow standard configparser grammer,
+    but some options for regular expressions ignore
+    line feed codes for convenience in configuration writing.
+    data/sample.conf provides same rules as default_script.py .
+
+    Args:
+        fp (str): file path of configparser text file.
+        
+    Retruns:
+        rules (tuple): a tuple of header_rules and split_rules.
+    """
 
     def _get_list(conf, section, option):
         # ignore line feed

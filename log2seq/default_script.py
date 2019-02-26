@@ -20,7 +20,7 @@ Also, log2seq parses timestamp by following named groups.
 - minute (digit)
 - second (digit)
 - microsecond (digit, optional)
-- tz (utc offset (like +0900) or tzname (like UTC))
+- tz (utc offset (like +0900) or tzname (like UTC), optional)
 Usually, you also need to give host (str) named group for further analysis.
 
 * split_rules (list of (action, target))

@@ -17,7 +17,7 @@ data_dir = "/".join((package_name, "data"))
 data_files = ["/".join((data_dir, fn)) for fn in os.listdir(data_dir)]
 
 setup(name=package_name,
-      version='0.0.2',
+      version='0.0.3',
       description='A tool to parse syslog-like messages into word sequences',
       long_description=read_md('README.md'),
       author='Satoru Kobayashi',
