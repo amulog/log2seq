@@ -24,7 +24,7 @@ Following is a sample code:
 
 	import log2seq
 	rules = log2seq.load_from_script("./default_parser.py")
-	parser = log2seq.init_parser("rules")
+	parser = log2seq.init_parser(rules)
 
 	d = parser.process_line(mes)
 	print(d["words"])
