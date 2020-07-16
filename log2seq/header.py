@@ -84,19 +84,29 @@ class HeaderParser(_HeaderParserBase):
     If you want to extract timestamp in datetime.datetime format
     (i.e., using reformat_timestamp option),
     the items should includes ones with special value names:
-        date (:obj:`datetime.date`)
-            or all of year (int), month (int), and day (int)
-            (Either is mandatory)
-        time (:obj:`datetime.time`, optional)
-            or all of hour (int), minute (int), and second (int)
-        microsecond (int, optional)
-        tzinfo (:obj:`datetime.tzinfo`, optional)
+
+    * date (Either is mandatory)
+
+        * date (:obj:`datetime.date`)
+        * all of year (:obj:`int`), month (:obj:`int`), and day (:obj:`int`)
+
+    * time (optional)
+
+        * time (:obj:`datetime.time`)
+        * all of hour (:obj:`int`), minute (:obj:`int`), and second (:obj:`int`)
+
+    * microsecond (:obj:`int`, optional)
+
+    * tzinfo (:obj:`datetime.tzinfo`, optional)
+
     If some of the Items not used, please add the values
     (in the specified type) in defaults.
     Note that "year" is missing in default syslogd configuration.
 
     Args:
-        items (list of Item): Define header formats as a sequence of
+        items (list of :obj:`Item`): Define header formats as a sequence of
+        separator (:obj: `str`, optional): Separators for header part.
+            Defaults to white spaces.
         defaults (:obj:`dict`, optional): Default values, used for
             missing values (for optional or missing items) in log messages.
         reformat_timestamp (:obj:`bool`, optional): Transform time-related
@@ -151,7 +161,7 @@ class HeaderParser(_HeaderParserBase):
         """Parse header part of a log message (i.e., a line).
 
         Args:
-            line (str): A log message, without line feed code.
+            line (str): A log message without line feed code.
 
         Returns:
             dict: Parsed items.

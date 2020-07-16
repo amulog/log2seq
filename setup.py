@@ -5,7 +5,7 @@ from setuptools import setup
 
 
 def load_readme():
-    with open('README.md', 'r') as f:
+    with open('README.rst', 'r') as f:
         return f.read()
 
 
@@ -18,12 +18,12 @@ def load_requirements():
 
 
 package_name = 'log2seq'
+version = '0.1.1'
 
 setup(name=package_name,
-      version='0.1.0',
+      version=version,
       description='A tool to parse syslog-like messages into word sequences',
       long_description=load_readme(),
-      long_description_content_type='text/markdown',
       author='Satoru Kobayashi',
       author_email='sat@nii.ac.jp',
       url='https://github.com/cpflat/log2seq/',
