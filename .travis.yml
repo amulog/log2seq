@@ -1,9 +1,16 @@
 language: python
 python:
-  - "3.6"
-  - "3.7"
-  - "3.8"
+- '3.6'
+- '3.7'
+- '3.8'
 install:
-  - pip install -r requirements.txt
+- pip install -r requirements.txt
 script:
-  - python -m unittest
+- python -m unittest
+deploy:
+  provider: pypi
+  username: "__token__"
+  password:
+    secure: Y27AT8s5yR/JWogyQF45txbM/1Pk/t38TYaH40Glb8BGzZKNsBUbH31psHk5KWx1zXK2e1/8dfCdavyyLQ0sf5lFXWo3OIfkkXSDzyrxY1zwHhsd5T6mwXOXqpNUeimfUSX4nPq4wwbKUvRbTtprvzyOJMBKgPYp/gBkuHJoDwTkKGTAVdvI2mBNnvWrA1RIiUwAlQdr6k8u2OFjAt1fbtRy4HLXO9XmWQG52WWOKw7gppBIbglspRulZ0vuGC13QeWCFMfRI72qgiuE2R4qKmnjwVLTp/+6Pl5WFWwRfofcasT34kD335fu0C4GMVBFLQgiAAO10KcCK/BZlEkgJUW5zuPH6m613D0s7/ZXgweL9Q0D7hwhINBcMKVNnSdMVvp2elMpXWuPbvygcWr+5yloX3SK9W0zDNkvp1DDE/N/S52zhkIV8g4nU+958Keg2w9yoSuIm2ns3Ai19qQLrpArLvJxZi6RUKxW22EhN1pH5G7aABTrBZmFHwPzlHZ0UoDwftMcpJDaBaPRhIBzEyDoV7ckz5Y/hi9BUDtyVF3l1uuJyalVYMc+MmxgZTLZJmeDVFvF3EYxtuirN9qameiYHJrCFccxWbxIZtFTJWnYsHx2y4G3ELzcgwCY8fQLhnJ8UoHeXOga9HPz0+dEivP3jP1ICWfuiXU1P1uOYOk=
+  on:
+    tags: true

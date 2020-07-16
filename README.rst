@@ -2,20 +2,54 @@
 log2seq
 #######
 
-log2seq is a python package to help parsing syslog-like messages into word sequences that is more suitable for further automated analysis.
-It is based on a customizable procedure of rules in order, using regular expressions.
+.. image:: https://img.shields.io/pypi/v/log2seq
+    :target: https://pypi.org/project/log2seq/
+
+.. image:: https://img.shields.io/pypi/pyversions/log2seq
+    :target: https://pypi.org/project/log2seq/
+
+.. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
+    :target: https://opensource.org/licenses/BSD-3-Clause
+
+.. image:: https://travis-ci.org/cpflat/log2seq.svg?branch=master
+    :target: https://travis-ci.org/cpflag/log2seq
 
 
-Introduction
+Log2seq is a python package to help parsing syslog-like messages into word sequences
+that is more suitable for further automated analysis.
+It is based on a procedure customizable with rules in order, using regular expressions.
+
+* Author: `Satoru Kobayashi <https://github.com/cpflat/>`_
+* Document: TBA
+* Source: https://github.com/cpflat/log2seq
+* Bug Reports: https://github.com/cpflat/log2seq/issues
+
+
+Installation
 ============
 
-In log analysis, sometimes you may face following format of log messages:
+You can install log2seq with pip.
+
+::
+
+    pip install log2seq
+
+
+Tutorial
+========
+
+Log2seq is designed mainly for preprocessing of automated log template generation.
+Many implementations of template generation methods requires input log messages in segmented format,
+but they only support simple preprocessing, using white spaces.
+Log2seq enables more flexible preprocessing enough for parsing practical log messages.
+
+For example, sometimes you may face following format of log messages:
 
 ::
 
 	Jan  1 12:34:56 host-device1 system[12345]: host 2001:0db8:1234::1 (interface:eth0) disconnected
 
-This message cannot well splitted with str.split or re.split, because the usage of :code:`:` is not consistent.
+This message cannot well segmented with str.split or re.split, because the usage of :code:`:` is not consistent.
 
 log2seq processes this message in multiple steps (in default):
 
@@ -33,30 +67,22 @@ Following is a sample code:
 	import log2seq
 	parser = log2seq.init_parser()
 
-	d = parser.process_line(mes)
-	print(d["words"])
+	parsed_line = parser.process_line(mes)
 
-It outputs following sequence.
+Here, you can get the parsed information like:
 
 ::
 
-	['system', '12345', 'host', '2001:0db8:1234::1', 'interface', 'eth0', 'disconnected']
+    >>> print(parsed_line["timestamp"])
+    datetime.datetime(2020, 1, 1, 12, 34, 56)
 
-You can see :code:`:` in ipv6 addr is left, and other :code:`:` are ignored.
+    >>> print(parsed_line["host"])
+    'host-device1'
 
+    >>> print(parsed_line["words"])
+    ['system', '12345', 'host', '2001:0db8:1234::1', 'interface', 'eth0', 'disconnected']
 
-Code
-====
+You can see :code:`:` in IPv6 address is left as is, and other :code:`:` are removed.
 
-The source code is available at https://github.com/cpflat/log2seq
-
-
-License
-=======
-3-Clause BSD license
-
-
-Author
-======
-Satoru Kobayashi
-
+This example is using a default parser, but you can also customize your own parser.
+For defails, please see the document.
