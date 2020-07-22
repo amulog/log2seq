@@ -3,30 +3,34 @@ log2seq
 #######
 
 .. image:: https://img.shields.io/pypi/v/log2seq
-    :alt: PyPI release
-    :target: https://pypi.org/project/log2seq/
+   :alt: PyPI release
+   :target: https://pypi.org/project/log2seq/
 
 .. image:: https://img.shields.io/pypi/pyversions/log2seq
-    :alt: Python support
-    :target: https://pypi.org/project/log2seq/
+   :alt: Python support
+   :target: https://pypi.org/project/log2seq/
 
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
-    :alt: BSD 3-Clause License
-    :target: https://opensource.org/licenses/BSD-3-Clause
+   :alt: BSD 3-Clause License
+   :target: https://opensource.org/licenses/BSD-3-Clause
 
 .. image:: https://travis-ci.org/cpflat/log2seq.svg?branch=master
-    :alt: Travis CI
-    :target: https://travis-ci.org/cpflag/log2seq
+   :alt: Travis CI
+   :target: https://travis-ci.org/cpflag/log2seq
+
+.. image:: https://readthedocs.org/projects/log2seq/badge/?version=latest
+   :alt: Documentation Status
+   :target: https://log2seq.readthedocs.io/en/latest/?badge=latest
 
 
 Log2seq is a python package to help parsing syslog-like messages into word sequences
 that is more suitable for further automated analysis.
 It is based on a procedure customizable with rules in order, using regular expressions.
 
-* Author: `Satoru Kobayashi <https://github.com/cpflat/>`_
-* Document: TBA
+* Document: https://log2seq.readthedocs.io
 * Source: https://github.com/cpflat/log2seq
 * Bug Reports: https://github.com/cpflat/log2seq/issues
+* Author: `Satoru Kobayashi <https://github.com/cpflat/>`_
 
 
 Installation
