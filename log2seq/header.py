@@ -78,42 +78,51 @@ class HeaderParser(_HeaderParserBase):
     Header parts in log messages provides some items of meta-information.
     For example, default syslogd records messages with timestamps
     and hostnames as header information.
-    The other parts (free-format statements) are parsed as
-    'statement' item.
+    The other parts (free-format statements) are parsed as statement part
+    (with item :class:`Statement`).
 
-    If you want to extract timestamp in datetime.datetime format
+    A HeaderParser rule is represented with a list of :class:`Item`.
+    Item is a component of regular expression patterns
+    to parse corresponding variable item.
+    HeaderParser automatically generate one regular expression pattern
+    from the items, and test that it matchs with input log messages.
+    If matched, HeaderParser extracts variables for the items.
+
+    In HeaderParser rule, one :class:`Statement` item is mandatory.
+    Also, if you want to extract timestamp in datetime.datetime format
     (i.e., using reformat_timestamp option),
-    the items should includes ones with special value names:
+    the items should includes ones with special value names (see :attr:`~Item.value_name`):
 
-    * date (Either is mandatory)
+    * year (int)
+    * month (int)
+    * day (int)
+    * hour (int, optional)
+    * minute (int, optional)
+    * second (int, optional)
+    * microsecond (int, optional)
+    * tzinfo (datetime.tzinfo, optional)
 
-        * date (:obj:`datetime.date`)
-        * all of year (:obj:`int`), month (:obj:`int`), and day (:obj:`int`)
+    Besides, you can also use aggregated items with following value names:
 
-    * time (optional)
-
-        * time (:obj:`datetime.time`)
-        * all of hour (:obj:`int`), minute (:obj:`int`), and second (:obj:`int`)
-
-    * microsecond (:obj:`int`, optional)
-
-    * tzinfo (:obj:`datetime.tzinfo`, optional)
+    * datetime (datetime.datetime): all
+    * date (datetime.date): year, month, day
+    * time (datetime.time): hour, minute, second, microsecond, tzinfo
 
     If some of the Items not used, please add the values
     (in the specified type) in defaults.
-    Note that "year" is missing in default syslogd configuration.
+    Note that "year" is missing in some logging framework
+    (e.g., default syslogd configuration).
 
     Args:
-        items (list of :obj:`Item`): Define header formats as a sequence of
-        separator (:obj: `str`, optional): Separators for header part.
+        items (list of :class:`Item`): header format rule.
+        separator (str, optional): Separators for header part.
             Defaults to white spaces.
-        defaults (:obj:`dict`, optional): Default values, used for
+        defaults (dict, optional): Default values, used for
             missing values (for optional or missing items) in log messages.
-        reformat_timestamp (:obj:`bool`, optional): Transform time-related
-            items into a timestamp in :obj:`datetime.datetime` object.
-            Defaults to True.
+        reformat_timestamp (bool, optional): Transform time-related
+            items into a timestamp in datetime.datetime object.
             Set false if log messages do not have timestamps.
-        astimezone (:obj:`datetime.tzinfo`, optional): Convert timestamp to
+        astimezone (datetime.tzinfo, optional): Convert timestamp to
             given new timezone by calling datetime.datetime.astimezone().
             Effective only when reformat_timestamp is True.
     """
@@ -209,7 +218,7 @@ class Item(ABC):
     @property
     @abstractmethod
     def pattern(self):
-        """Get regular expression pattern for this *Item class*
+        """str: Get regular expression pattern for this *Item class*
         in string format."""
         raise NotImplementedError
 
@@ -225,26 +234,38 @@ class Item(ABC):
 
     @property
     def match_name(self):
-        """Match name for this Item.
+        """str: Match name of this Item.
+
         Match name is used to distinguish the extracted values
-        in re MatchObject.
+        in `re <https://docs.python.org/ja/3/library/re.html>`_
+        MatchObject.
         Match name cannot be duplicated in a set of ParserHeader items.
         """
         return self._match_name
 
     @property
     def value_name(self):
-        """Value name for this Item.
-        Value name is used as the keys of return value of HeaderParser.
+        """str: Value name of this :class:`Item`.
+
+        Value name is used as the keys of return value of :class:`HeaderParser`.
         Also, timestamps are reformatted with specific value names.
         """
         return self._value_name
 
     def get_regex(self, separator=r'\s+', last=False):
-        """Get regular expression pattern for this *Item instance*
+        """Get regular expression pattern of this :class:`Item` instance
         in string format.
         The pattern is modified considering the options
-        for HeaderParser and this Item."""
+        for :class:`HeaderParser` and this :class:`Item`.
+
+        Args:
+            separator (str, optional): separator regular expression pattern.
+            last (bool, optional): True if this Item instance is the last one
+                in :class:`HeaderParser` items.
+
+        Returns:
+            str: regular expression pattern of this Item instance.
+        """
         return self._enclose_regex(self.pattern, separator, last)
 
     def _enclose_regex(self, core, separator, last):
@@ -260,17 +281,15 @@ class Item(ABC):
 
     def pick(self, mo):
         """Get value name and the extracted values
-        from re MatchObject in appropriate format.
+        from `re <https://docs.python.org/ja/3/library/re.html>`_
+        MatchObject in appropriate format.
 
         Args:
-            mo: re MatchObject for combined pattern of HeaderParser.
+            mo: MatchObject for combined pattern of :class:`HeaderParser`.
 
         Returns:
-            string: name to recognize the picked value.
-            any: see Items.pick_value().
-
-        Note: the returned name is different from the value name
-        (see Item.value_name).
+            tuple: :attr:`~Item.value_name` and the value
+            extracted by :meth:`Item.pick_value`.
         """
         try:
             return self.value_name, self.pick_value(mo)
@@ -283,15 +302,15 @@ class Item(ABC):
             raise _common.ParserDefinitionError(msg)
 
     def pick_value(self, mo):
-        """Get values from re MatchObject in appropriate format.
+        """Get a value from `re <https://docs.python.org/ja/3/library/re.html>`_
+        MatchObject in appropriate format.
 
         Args:
-            mo: re MatchObject for combined pattern of HeaderParser.
+            mo: MatchObject for combined pattern of :class:`HeaderParser`.
 
         Returns:
-            any: Extracted value for this Item.
-                Any type, depending on the class.
-                If not specified, a matched string value is returned as is.
+            Extracted value for this :class:`Item`. Any type, depending on the class.
+            If not specified, a matched string value is returned as is.
         """
         return mo[self.match_name]
 
@@ -310,8 +329,8 @@ class Statement(Item):
 
 class MonthAbbreviation(Item):
     """Item for abbreviated month names.
-    Strings with first capitalized 3 characters will match.
-    e.g., "Jan", "Feb", "Mar", ...
+    Strings with first capitalized 3 characters will match
+    (e.g., :samp:`Jan`, :samp:`Feb`, :samp:`Mar`, ...).
     """
     _match_name = "month_abb"
     _value_name = "month"
@@ -332,8 +351,8 @@ class DatetimeISOFormat(Item):
     Datetime information (year, month, day, hour minute, second)
     are always included.
     Microseconds and timezone are optionally extracted.
-    e.g., "2112-09-03T11:22:33"
-    e.g., "2112-09-03T11:22:33.012345+09:00"
+    | e.g., :samp:`2112-09-03T11:22:33`
+    | e.g., :samp:`2112-09-03T11:22:33.012345+09:00`
     """
     _match_name = "iso_datetime"
     _value_name = _KEY_TIMESTAMP
@@ -354,7 +373,7 @@ class Date(Item):
     """Item for date, including year, month, and day.
     Represented in eight-letter numeric string separated with two hyphens.
     Similar to the formar part of DatetimeISOFormat.
-    e.g., "2112-09-03"
+    | e.g., :samp:`2112-09-03`
     """
     _match_name = "date"
     _value_name = _KEY_DATE
@@ -371,8 +390,8 @@ class Date(Item):
 
 class Time(Item):
     """Item for time, including hour, minute, and second.
-    It can also include microsecond and timezone, as like DatetimeISOFormat.
-    e.g., "11:22:33"
+    It can also include microsecond and timezone, as like :class:`DatetimeISOFormat`.
+    | e.g., :samp:`11:22:33`
     """
     _match_name = "iso_time"
     _value_name = _KEY_TIME
@@ -384,19 +403,21 @@ class Time(Item):
                 r'([+-](\d{2})\:(\d{2}))?')  # timezone
 
     def pick_value(self, mo):
-        """Returns :obj:`datetime.time`."""
+        """Returns `datetime.time <https://docs.python.org/ja/3/library/datetime.html>`_."""
         dt = dateutil.parser.parse(mo[self.match_name])
         return dt.time()
 
 
 class NamedItem(Item, ABC):
-    """A base class of namable Items.
-    Namable Items requires an argument for the name.
-    The name should not be duplicated with other Items
-    (including unnamable Items) in one HeaderParser pattern.
+    """A base class of namable items.
+    Namable items requires an argument for the name.
+    The name is used as match name and value name.
+    The name should not be duplicated with match names of other items
+    (including unnamable items) in one :class:`HeaderParser` rule.
 
     Args:
-        name (string): Used as match name and value name.
+        name (string): name of :class:`Item` instance,
+            used as match name and value name.
     """
 
     def __init__(self, name, **kwargs):
@@ -413,7 +434,7 @@ class NamedItem(Item, ABC):
 
 
 class Digit(NamedItem):
-    """A namable Item for a digit value."""
+    """:class:`NamedItem` for a digit value."""
     pattern = r'\d+'
 
     def pick_value(self, mo):
@@ -422,7 +443,7 @@ class Digit(NamedItem):
 
 
 class String(NamedItem):
-    """A namable Item for a string.
+    """:class:`NamedItem` for a string.
 
     The string can include digit and alphabet, without any symbol strings.
     """
@@ -430,7 +451,7 @@ class String(NamedItem):
 
 
 class Hostname(NamedItem):
-    """A namable Item for a hostname (or IPaddress) string.
+    """:class:`NamedItem` for a hostname (or IPaddress) string.
 
     Check Hostname.pattern to see the accepted names.
     If your hostname does not match the pattern,
@@ -443,19 +464,23 @@ class Hostname(NamedItem):
 
 
 class UserItem(NamedItem):
-    """Customizable namable Item.
+    """Customizable :class:`NamedItem`.
 
-    Do not use special characters for options such as '?'.
+    The pattern is described in Python Regular Expression Syntax
+    (`re <https://docs.python.org/ja/3/library/re.html>`_).
+    Some special characters are not allowed to use for this Item.
+
+    * Optional parts, such as :regexp:`?`
+    * :regexp:`^` and :regexp:`$`
 
     Args:
-        name: see NamedItem.
-        pattern: Pattern of the value for this Item.
-            The pattern will be internally escaped.
+        name: same as NamedItem.
+        pattern: regular expression pattern of this Item instance.
     """
 
     def __init__(self, name, pattern, **kwargs):
         super().__init__(name, **kwargs)
-        self._pattern = re.escape(pattern)
+        self._pattern = pattern
 
     @property
     def pattern(self):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import re
 from setuptools import setup
 
 
@@ -18,7 +19,10 @@ def load_requirements():
 
 
 package_name = 'log2seq'
-version = '0.1.1'
+
+with open(os.path.join(os.path.dirname(__file__), package_name, '__init__.py')) as f:
+    version = re.search("__version__ = '([^']+)'", f.read()).group(1)
+
 
 setup(name=package_name,
       version=version,

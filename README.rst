@@ -3,15 +3,19 @@ log2seq
 #######
 
 .. image:: https://img.shields.io/pypi/v/log2seq
+    :alt: PyPI release
     :target: https://pypi.org/project/log2seq/
 
 .. image:: https://img.shields.io/pypi/pyversions/log2seq
+    :alt: Python support
     :target: https://pypi.org/project/log2seq/
 
 .. image:: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
+    :alt: BSD 3-Clause License
     :target: https://opensource.org/licenses/BSD-3-Clause
 
 .. image:: https://travis-ci.org/cpflat/log2seq.svg?branch=master
+    :alt: Travis CI
     :target: https://travis-ci.org/cpflag/log2seq
 
 
@@ -26,7 +30,7 @@ It is based on a procedure customizable with rules in order, using regular expre
 
 
 Installation
-============
+------------
 
 You can install log2seq with pip.
 
@@ -36,7 +40,7 @@ You can install log2seq with pip.
 
 
 Tutorial
-========
+--------
 
 Log2seq is designed mainly for preprocessing of automated log template generation.
 Many implementations of template generation methods requires input log messages in segmented format,
@@ -49,7 +53,7 @@ For example, sometimes you may face following format of log messages:
 
 	Jan  1 12:34:56 host-device1 system[12345]: host 2001:0db8:1234::1 (interface:eth0) disconnected
 
-This message cannot well segmented with str.split or re.split, because the usage of :code:`:` is not consistent.
+This message cannot well segmented with :code:`str.split()` or :code:`re.split()`, because the usage of :code:`:` is not consistent.
 
 log2seq processes this message in multiple steps (in default):
 
@@ -73,13 +77,13 @@ Here, you can get the parsed information like:
 
 ::
 
-    >>> print(parsed_line["timestamp"])
+    >>> parsed_line["timestamp"]
     datetime.datetime(2020, 1, 1, 12, 34, 56)
 
-    >>> print(parsed_line["host"])
+    >>> parsed_line["host"]
     'host-device1'
 
-    >>> print(parsed_line["words"])
+    >>> parsed_line["words"]
     ['system', '12345', 'host', '2001:0db8:1234::1', 'interface', 'eth0', 'disconnected']
 
 You can see :code:`:` in IPv6 address is left as is, and other :code:`:` are removed.

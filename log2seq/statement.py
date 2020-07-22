@@ -20,20 +20,33 @@ class StatementParser:
 
     Statement parts in log messages describe the event in free-format text.
     This parser will segment the text into words and theire separators.
-    The words are parsed as 'words' items, and the separators are
-    parsed as `symbols`.
+    The words are parsed as 'words' item, and the separators are
+    parsed as 'symbols' item.
 
-    The behavior of this parser is defined with a sequence of actions.
+    The behavior of this parser is defined with a list of actions.
     The actions are sequentially applied into the statement,
     and separate it into a sequence of words (and separator symbols).
 
     Args:
-        actions (list of _ActionBase): Segmentation rules.
+        actions (list of any action): Segmentation rules.
             The rules are sequentially applied to the input statement.
     """
 
     def __init__(self, actions):
-        self._l_act = actions + [_Reformat()]
+        self._l_act = actions
+
+    @staticmethod
+    def _verbose(act, input_parts, input_flags):
+        act_name = act.__class__.__name__
+        words = []
+        for part, flag in zip(input_parts, input_flags):
+            if flag == _FLAG_FIXED:
+                words.append("#" + part + "#")
+            elif flag == _FLAG_UNKNOWN:
+                words.append("'" + part + "'")
+            else:
+                pass
+        print("{0}: {1}".format(act_name, ", ".join(words)))
 
     @staticmethod
     def _separate(input_parts, input_flags):
@@ -63,24 +76,31 @@ class StatementParser:
         assert len(l_s) == len(l_w) + 1
         return l_w, l_s
 
-    def process_line(self, statement: str):
-        """Parse statemtn part of a log message (i.e., a line).
+    def process_line(self, statement: str, verbose: bool = False):
+        """Parse statement part of a log message (i.e., a line).
 
         Args:
             statement (string): String of statement part.
+            verbose (bool, optional): Show intermediate progress
+                of applying actions.
 
         Returns:
-            words (list): Segmented words.
-            symbols (list): Separator symbol strings. The length is
-                always len(words)+1, which includes
-                ones before first word and ones after last word.
-                Some of the symbols can be empty string.
+            tuple: List of two components: words and symbols.
+            First component, words, is list of words.
+            Second component, symbols, is list of separator string symbols.
+            The length of symbols is always len(words)+1, which includes
+            one before first word and one after last word.
+            Some of the symbols can be empty string.
         """
+        if verbose:
+            print("Statement: {0}".format(statement))
         parts = [statement]
         flags = [_FLAG_UNKNOWN]
 
         for act in self._l_act:
             parts, flags = act.do(parts, flags)
+            if verbose:
+                self._verbose(act, parts, flags)
         return self._separate(parts, flags)
 
 
@@ -108,7 +128,13 @@ class Fix(_ActionBase):
     """Add Fixed flag to matched parts.
 
     Fixed parts will not be segmented by following actions.
-    Fixed parts are selected by regular expression of given pattern.
+    Fixed parts are selected by regular expression of given pattern
+    (see `re <https://docs.python.org/ja/3/library/re.html>`_).
+
+    Example:
+        >>> p = StatementParser([Split(" "), Fix(r".+\\.txt"), Split(".")])
+        >>> p.process_line("parsing sample.txt done.")
+        (['parsing', 'sample.txt', 'done'], ['', ' ', ' ', '.'])
 
     Args:
         patterns (str or list of str):
@@ -133,12 +159,10 @@ class Fix(_ActionBase):
 
         Args:
             input_parts (list of str): partially segmented statement.
-            input_flags (list of integer): annotation of input_parts.
+            input_flags (list of int): annotation of input_parts.
 
         Returns:
-            list of str: parts after this action. In the case of Fix action
-                (not FixPartial), this return value is same as input_parts.
-            list of integer: annotation of the returned parts.
+            tuple: same format as the input arguments.
         """
         ret_parts = input_parts[:]
         ret_flags = input_flags[:]
@@ -187,28 +211,35 @@ class _FixPartialBase(Fix, ABC):
 class FixPartial(_FixPartialBase):
     """Extended Fix action to accept complicated patterns.
 
-    Usual Fix action consider the matched part as a word, and fixed.
-    In contrast, FixPartial allow the matched part
+    Usual :class:`Fix` consider the matched part as a word, and fix it.
+    In contrast, :class:`FixPartial` allow the matched part
     to include multiple fixed words or separators.
 
     Usecase 1:
-        e.g., source 192.0.2.1.80 initialized.
-        If you intend to consider 192.0.2.1.80 as a combination
-        of two different word: IPv4 address 192.0.2.1 and port number 80,
+        | e.g., :samp:`source 192.0.2.1.80 initialized.`
+        If you intend to consider :samp:`192.0.2.1.80` as a combination
+        of two different word: IPv4 address :samp:`192.0.2.1` and port number :samp:`80`,
         this cannot be segmented with simple Fix and Split actions.
-        After Split action with white space,
-        FixPartial can fix the two variables with pattern such as
-        r'^(?P<ipaddr>(\\d{1,3}\\.){3}\\d{1,3})\\.(?P<port>\\d{1,5})$'.
+        Following example with :class:`FixPartial` can fix these two variables.
+
+    Example:
+        >>> pattern = r'^(?P<ipaddr>(\\d{1,3}\\.){3}\\d{1,3})\\.(?P<port>\\d{1,5})$'
+        >>> parser = StatementParser([Split(" "), FixPartial(pattern, fix_groups=["ipaddr", "port"]), Split(".")])
+        >>> parser.process_line("source 192.0.2.1.80 initialized.")
+        (['source', '192.0.2.1', '80', 'initialized'], ['', '', '.', '', '.'])
+
     Usecase 2:
-        e.g., comment added: "This is a comment description".
+        | e.g., :samp:`comment added: "This is a comment description".`
         If you intend to consider the comment (strings between parenthesis)
         as a word without segmentation,
         this cannot be achieved with with simple Fix and Split actions.
-        FixPartial can fix the comment part
-        with pattern r'^.*?"(?P<fix>.+?)".*$' and rest_remove=False.
-        After following Split action with '":. ',
-        this statement is appropriately segmented.
-        Note: Consider using FixParenthesis to easily handle this case.
+        Following example with :class:`FixPartial` can fix the comment part.
+
+    Example:
+        >>> pattern = r'^.*?"(?P<fix>.+?)".*$'
+        >>> parser = StatementParser([FixPartial(pattern, fix_groups=["fix"], rest_remove=False), Split(' :."')])
+        >>> parser.process_line('comment added: "This is a comment description".')
+        (['comment', 'added', 'This is a comment description'], ['', ' ', ': "', '".'])
 
     Args:
         patterns (str or list of str): Regular expression patterns.
@@ -248,20 +279,26 @@ class FixParenthesis(_FixPartialBase):
     The basic usage is similar to FixPartial, but
     this class is designed especially for parenthesis,
     and the format of patterns is simpler.
-    For example, FixParenthesis with pattern ['"', '"'] work samely as
-    FixPartial with pattern r'^.*?"(?P<fix>.+?)".*$'.
+    For example, FixParenthesis with pattern :samp:`['"', '"']` work samely as
+    FixPartial with pattern :regexp:`r'^.*?"(?P<fix>.+?)".*$'`.
 
     Each pattern is a 2-length list of left and right parenthesis.
     The left and right pattern can consist of multiple characters,
-    such as ["<!--", "-->"].
+    such as :samp:`["<!--", "-->"]`.
+
+    Example:
+        >>> parser = StatementParser([FixParenthesis(['"', '"']), Split(' .:"')])
+        >>> parser.process_line('comment added: "This is a comment description".')
+        (['comment', 'added', 'This is a comment description'], ['', ' ', ': "', '".'])
 
     Note: If a statement has multiple pairs of parenthesis,
     you need to add multiple FixParenthesis action to StatementParser actions.
-    This is because FixParenthesis accept only one fix_group.
+    This is because FixParenthesis accept only one fix_group
+    to extract in the action.
     """
-    key_fix = "fix"
+    _key_fix = "fix"
     _rest_flag = _FLAG_UNKNOWN
-    _fix_groups = [key_fix, ]
+    _fix_groups = [_key_fix, ]
 
     def _init_patterns(self, patterns):
         if isinstance(patterns, str):
@@ -279,7 +316,7 @@ class FixParenthesis(_FixPartialBase):
         p_left = parent_pattern[0]
         p_right = parent_pattern[1]
         restr = r'^.*?' + re.escape(p_left) + \
-                '(?P<' + cls.key_fix + r'>.+?)' + \
+                '(?P<' + cls._key_fix + r'>.+?)' + \
                 re.escape(p_right) + r'.*$'
         return re.compile(restr)
 
@@ -329,17 +366,23 @@ class FixIP(_ActionBase):
 
 
 class Split(_ActionBase):
-    """Split parts by given separators.
+    """Split statement (or its parts) by given separators.
 
-    For example, separators ' .' translates
-        ['This is a statement.'] -> ['This', 'is', 'a', 'statement']
-    The separators (white spaces in this case) will not be considered
-    in further actions.
+    For example, separators :samp:` .` (white space and dot) translates
+    | :samp:`['This is a statement.'] -> ['This', 'is', 'a', 'statement']`
+    The removed separators (white space and dot in this case)
+    will not be considered in further actions.
+
+    Example:
+        >>> parser = StatementParser([Split(" .")])
+        >>> parser.process_line("This is a statement.")
+        (['This', 'is', 'a', 'statement'], ['', ' ', ' ', ' ', '.'])
 
     Args:
-        separators (str or list of str): separator symbol strings.
-            If iterable, they are all used for segmentation.
-            Internally escaped, so you do not need escape sequence in.
+        separators (str): separator symbol strings.
+            If iterable, they are imply joined and used all for segmentation.
+            Escape sequence is internally added, so you don't need
+            to add it manually.
     """
 
     def __init__(self, separators):
@@ -355,16 +398,16 @@ class Split(_ActionBase):
         return self._get_blocks(part, a_stat)
 
     def do(self, input_parts, input_flags):
-        """Apply this action to all parts.
+        """Apply this action to all input parts.
         This function works as like a filter of the statement.
+        This method function is used by StatementParser.
 
         Args:
             input_parts (list of str): partially segmented statement.
-            input_flags (list of integer): annotation of input_parts.
+            input_flags (list of int): annotation of input_parts.
 
         Returns:
-            list of str: parts after this action.
-            list of integer: annotation of the returned parts.
+            tuple: same format as the input arguments.
         """
         ret_parts = []
         ret_flags = []
@@ -377,31 +420,4 @@ class Split(_ActionBase):
             else:
                 ret_parts.append(part)
                 ret_flags.append(flag)
-        return ret_parts, ret_flags
-
-
-class _Reformat(_ActionBase):
-
-    def do(self, input_parts, input_flags):
-        ret_parts = []
-        ret_flags = []
-        prev_isword = True
-        for i, (part, flag) in enumerate(zip(input_parts, input_flags)):
-            current_isword = flag in (_FLAG_FIXED, _FLAG_UNKNOWN)
-            if current_isword and prev_isword:
-                # separator is missing: add empty separator
-                ret_parts += ["", part]
-                ret_flags += [_FLAG_SEPARATORS, _FLAG_FIXED]
-            elif not current_isword and not prev_isword:
-                # continuous separator: merge into 1 separator
-                ret_parts[-1] = ret_parts[-1] + part
-            else:
-                # as is
-                ret_parts.append(part)
-                ret_flags.append(flag)
-            prev_isword = current_isword
-        else:
-            if prev_isword:
-                ret_parts.append("")
-                ret_flags.append(_FLAG_SEPARATORS)
         return ret_parts, ret_flags
