@@ -217,6 +217,7 @@ class FixPartial(_FixPartialBase):
 
     Usecase 1:
         | e.g., :samp:`source 192.0.2.1.80 initialized.`
+
         If you intend to consider :samp:`192.0.2.1.80` as a combination
         of two different word: IPv4 address :samp:`192.0.2.1` and port number :samp:`80`,
         this cannot be segmented with simple Fix and Split actions.
@@ -230,6 +231,7 @@ class FixPartial(_FixPartialBase):
 
     Usecase 2:
         | e.g., :samp:`comment added: "This is a comment description".`
+
         If you intend to consider the comment (strings between parenthesis)
         as a word without segmentation,
         this cannot be achieved with with simple Fix and Split actions.
