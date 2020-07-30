@@ -30,11 +30,12 @@ class LogParser:
     """Log parser object.
 
     LogParser in log2seq consists of two different parsers:
-    HeaderParser and StatementParser.
+    :class:`~header.HeaderParser` and :class:`~statement.StatementParser`.
 
     Parsed results are returned in one dict object.
     It consists of following parsed information.
-    * Header informations (value name as key)
+
+    * Header informations (:attr:`~header.Item.value_name` as key)
     * Statement part in string format ("message" as key)
     * Segmented words in statement part ("words" as key)
     * Separator symbols in ststement part ("symbols" as key)
@@ -54,14 +55,14 @@ class LogParser:
         >>> parsed_line["symbols"]  # Separator symbols parsed by StatementParser
         ['', '[', ']: ', ' ', ' (', ':', ') ', '']
 
-    You can specify multiple HeaderParser as input.
-    If so, LogParser try to parse a log message with them in order,
+    You can specify multiple :class:`~header.HeaderParser` as input.
+    If so, :class:`LogParser` try to parse a log message with them in order,
     and the first matched rule is used for the message.
 
     Args:
-        header_parsers (:obj:`header.HeaderParser` or list of it):
+        header_parsers (:obj:`~header.HeaderParser` or list of it):
             one or multiple HeaderParser instance to use.
-        statement_parser (:obj:`statement.StatementParser`):
+        statement_parser (:obj:`~statement.StatementParser`):
             one StatementParser instance to use.
     """
 
@@ -108,6 +109,21 @@ class LogParser:
             raise LogParseFailure(msg)
         return ret
 
+    def process_statement(self, statement, verbose=False):
+        """Parse a log statement.
+
+        Args:
+            statement (str): Statement part in a log message.
+            verbose (bool, optional): Show intermediate progress
+                of applying rules.
+
+        Returns:
+            tuple: List of two components: words and symbols.
+            See :meth:`statement.StatementParser.process_line`.
+        """
+
+        return self.statement_parser.process_line(statement, verbose)
+
     def process_line(self, line, verbose=False):
         """Parse a log message (i.e., a line).
 
@@ -128,26 +144,25 @@ class LogParser:
         d = self.process_header(line, verbose)
         mes = d[KEY_STATEMENT]
         if mes:
-            l_w, l_s = self.statement_parser.process_line(mes, verbose)
+            l_w, l_s = self.process_statement(mes, verbose)
             d[KEY_WORDS] = l_w
             d[KEY_SYMBOLS] = l_s
         return d
 
 
 def init_parser(header_parsers=None, statement_parser=None):
-    """Generate LogParser object.
+    """Generate :class:`LogParser` object.
 
     If no arguments are given,
     this function generates LogParser with default configurations.
-    (About the default configuration, see preset.)
 
     Args:
-        header_parsers (:obj:`HeaderParser` or list of it, optional):
+        header_parsers (:class:`~header.HeaderParser` or list of it, optional):
             one or multiple HeaderParser instance to use.
-            If not given, use preset.default_header_parsers().
-        statement_parser (:obj:`statement.StatementParser`):
+            If not given, use :func:`preset.default_header_parsers`.
+        statement_parser (:class:`~statement.StatementParser`):
             one StatementParser instance to use.
-            If not given, use preset.default_statement_parser().
+            If not given, use :func:`preset.default_statement_parser`.
     """
 
     if header_parsers is None:

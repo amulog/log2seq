@@ -20,7 +20,7 @@ def default_header_parsers():
 
     * Rule 1 (designed for syslogd default format)
 
-        * year (:class:`~log2seq.header.Digit`, optional)
+        * year (:class:`~header.Digit`, optional)
         * month (:class:`~log2seq.header.MonthAbbreviation`)
         * day (:class:`~log2seq.header.Digit`)
         * time (:class:`~log2seq.header.Time`)
@@ -58,10 +58,10 @@ def default_statement_parser():
 
     The default parser consists of 4 step actions.
 
-    * :class:`~log2seq.statement.Split` with standard symbols including white space and parenthesis
-    * :class:`~log2seq.statement.FixIP` to fix IP addresses (including network address)
-    * :class:`~log2seq.statement.Fix` with timestamps and MAC addresses
-    * :class:`~log2seq.statement.Split` with :samp:`:`
+    #. :class:`~log2seq.statement.Split` with standard symbols including white space and parenthesis
+    #. :class:`~log2seq.statement.FixIP` to fix IP addresses (including network address)
+    #. :class:`~log2seq.statement.Fix` with timestamps and MAC addresses
+    #. :class:`~log2seq.statement.Split` with :samp:`:`
 
     Returns:
         :class:`~log2seq.statement.StatementParser`
@@ -80,7 +80,7 @@ def default():
 
     It consists of :func:`default_header_parsers`
     and :func:`default_statement_parser`.
-    :func:`init_parser` generates same instance without any arguments.
+    :func:`~log2seq.init_parser` generates same instance without any arguments.
 
     Returns:
         :class:`~log2seq.LogParser`

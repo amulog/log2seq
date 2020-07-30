@@ -370,8 +370,10 @@ class FixIP(_ActionBase):
 class Split(_ActionBase):
     """Split statement (or its parts) by given separators.
 
-    For example, separators :samp:` .` (white space and dot) translates
+    For example, separators of white space and dot translates
+
     | :samp:`['This is a statement.'] -> ['This', 'is', 'a', 'statement']`
+
     The removed separators (white space and dot in this case)
     will not be considered in further actions.
 
