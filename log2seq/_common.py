@@ -143,10 +143,9 @@ class LogParser:
             return None
         d = self.process_header(line, verbose)
         mes = d[KEY_STATEMENT]
-        if mes:
-            l_w, l_s = self.process_statement(mes, verbose)
-            d[KEY_WORDS] = l_w
-            d[KEY_SYMBOLS] = l_s
+        l_w, l_s = self.process_statement(mes, verbose)
+        d[KEY_WORDS] = l_w
+        d[KEY_SYMBOLS] = l_s
         return d
 
 

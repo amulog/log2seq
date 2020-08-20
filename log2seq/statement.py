@@ -56,7 +56,10 @@ class StatementParser:
         for i, (part, flag) in enumerate(zip(input_parts, input_flags)):
             current_isword = flag in (_FLAG_FIXED, _FLAG_UNKNOWN)
             if current_isword:
-                if prev_isword:
+                if part == "":
+                    # empty word: remove
+                    pass
+                elif prev_isword:
                     # separator is missing: add empty separator
                     l_s.append("")
                     l_w.append(part)
@@ -416,7 +419,7 @@ class Split(_ActionBase):
         ret_parts = []
         ret_flags = []
         for part, flag in zip(input_parts, input_flags):
-            if flag == _FLAG_UNKNOWN:
+            if len(part) > 0 and flag == _FLAG_UNKNOWN:
                 matchobjs = self._regex.finditer(part)
                 tmp_parts, tmp_flags = self._split_part(part, matchobjs)
                 ret_parts += tmp_parts

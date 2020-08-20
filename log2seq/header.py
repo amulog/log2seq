@@ -24,7 +24,7 @@ class _HeaderParserBase(ABC):
                  reformat_timestamp: bool = True,
                  astimezone: datetime.tzinfo = None):
 
-        self._defaults = defaults
+        self._defaults = defaults if defaults is not None else dict()
         self._reformat = reformat_timestamp
         self._astz = astimezone
 
@@ -351,7 +351,9 @@ class DatetimeISOFormat(Item):
     Datetime information (year, month, day, hour minute, second)
     are always included.
     Microseconds and timezone are optionally extracted.
+
     | e.g., :samp:`2112-09-03T11:22:33`
+
     | e.g., :samp:`2112-09-03T11:22:33.012345+09:00`
     """
     _match_name = "iso_datetime"
@@ -373,6 +375,7 @@ class Date(Item):
     """Item for date, including year, month, and day.
     Represented in eight-letter numeric string separated with two hyphens.
     Similar to the formar part of DatetimeISOFormat.
+
     | e.g., :samp:`2112-09-03`
     """
     _match_name = "date"
@@ -391,6 +394,7 @@ class Date(Item):
 class Time(Item):
     """Item for time, including hour, minute, and second.
     It can also include microsecond and timezone, as like :class:`DatetimeISOFormat`.
+
     | e.g., :samp:`11:22:33`
     """
     _match_name = "iso_time"

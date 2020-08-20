@@ -18,6 +18,16 @@ class TestStatement(unittest.TestCase):
                        "eth0", "disconnected"]
         assert l_s == ["", "[", "]: ", " ", " (", ":", ") ", ""]
 
+    def test_empty(self):
+        input_mes = " "
+
+        from log2seq.preset import default_statement_parser
+        sp = default_statement_parser()
+        l_w, l_s = sp.process_line(input_mes)
+
+        assert l_w == []
+        assert l_s == [" "]
+
     def test_fix_partial(self):
         input_mes = "source 192.0.2.1.80 initialized."
         statement_rules = [
