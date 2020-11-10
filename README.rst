@@ -16,7 +16,7 @@ log2seq
 
 .. image:: https://travis-ci.org/cpflat/log2seq.svg?branch=master
    :alt: Travis CI
-   :target: https://travis-ci.org/cpflag/log2seq
+   :target: https://travis-ci.org/github/cpflat/log2seq
 
 .. image:: https://readthedocs.org/projects/log2seq/badge/?version=latest
    :alt: Documentation Status
@@ -31,6 +31,7 @@ It is based on a procedure customizable with rules in order, using regular expre
 * Source: https://github.com/cpflat/log2seq
 * Bug Reports: https://github.com/cpflat/log2seq/issues
 * Author: `Satoru Kobayashi <https://github.com/cpflat/>`_
+* License: `BSD-3-Clause <https://opensource.org/licenses/BSD-3-Clause>`_
 
 
 Installation
