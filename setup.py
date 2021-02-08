@@ -6,15 +6,15 @@ from setuptools import setup
 
 
 def load_readme():
-    with open('README.rst', 'r') as f:
-        return f.read()
+    with open('README.rst', 'r') as fd:
+        return fd.read()
 
 
 def load_requirements():
     """Parse requirements.txt"""
     reqs_path = os.path.join('.', 'requirements.txt')
-    with open(reqs_path, 'r') as f:
-        requirements = [line.rstrip() for line in f]
+    with open(reqs_path, 'r') as fd:
+        requirements = [line.rstrip() for line in fd]
     return requirements
 
 

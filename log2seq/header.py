@@ -4,7 +4,6 @@ import copy
 import datetime
 import re
 from abc import ABC, abstractmethod
-import dateutil.parser
 
 from . import _common
 
@@ -368,7 +367,17 @@ class DatetimeISOFormat(Item):
 
     def pick_value(self, mo):
         """Returns :obj:`datetime.datetime`."""
-        return dateutil.parser.parse(mo[self.match_name])
+        # dateutil too slow!
+        # return dateutil.parser.parse(mo[self.match_name])
+
+        return self.parse_datetimestr(mo[self.match_name])
+
+    @staticmethod
+    def parse_datetimestr(string):
+        datestr, _, timestr = string.partition("T")
+        date = Date.parse_datestr(datestr)
+        time = Time.parse_timestr(timestr)
+        return datetime.datetime.combine(date, time)
 
 
 class Date(Item):
@@ -387,8 +396,18 @@ class Date(Item):
 
     def pick_value(self, mo):
         """Returns :obj:`datetime.date`."""
-        dt = dateutil.parser.parse(mo[self.match_name])
-        return dt.date()
+        # dateutil too slow!
+        # dt = dateutil.parser.parse(mo[self.match_name])
+        # return dt.date()
+
+        return self.parse_datestr(mo[self.match_name])
+
+    @staticmethod
+    def parse_datestr(string):
+        d = {"year": int(string[0:4]),
+             "month": int(string[5:7]),
+             "day": int(string[8:10])}
+        return datetime.date(**d)
 
 
 class Time(Item):
@@ -408,8 +427,49 @@ class Time(Item):
 
     def pick_value(self, mo):
         """Returns `datetime.time <https://docs.python.org/ja/3/library/datetime.html>`_."""
-        dt = dateutil.parser.parse(mo[self.match_name])
-        return dt.time()
+        # dateutil too slow!
+        # dt = dateutil.parser.parse(mo[self.match_name])
+        # return dt.time()
+
+        # manual parse
+        return self.parse_timestr(mo[self.match_name])
+
+    @staticmethod
+    def parse_timestr(string):
+        d = {"hour": int(string[0:2]),
+             "minute": int(string[3:5]),
+             "second": int(string[6:8])}
+        opt = string[8:]
+        if '.' in string:
+            d["microsecond"] = int(opt[1:7])
+            opt = opt[7:]
+        if len(opt) > 0:
+            d["tzinfo"] = Time.parse_tz(opt)
+        return datetime.time(**d)
+
+    @staticmethod
+    def parse_tz(string):
+        # referring official _strptime.py (v3.7.2)
+        z = string.lower()
+        if z[3] == ':':
+            z = z[:3] + z[4:]
+            if len(z) > 5:
+                if z[5] != ':':
+                    raise ValueError
+                z = z[:5] + z[6:]
+        hours = int(z[1:3])
+        minutes = int(z[3:5])
+        seconds = int(z[5:7] or 0)
+        gmtoff = (hours * 60 * 60) + (minutes * 60) + seconds
+        gmtoff_remainder = z[8:]
+        gmtoff_remainder_padding = "0" * (6 - len(gmtoff_remainder))
+        gmtoff_fraction = int(gmtoff_remainder + gmtoff_remainder_padding)
+        if z.startswith("-"):
+            gmtoff = -gmtoff
+            gmtoff_fraction = -gmtoff_fraction
+        tzdelta = datetime.timedelta(seconds = gmtoff,
+                                     microseconds = gmtoff_fraction)
+        return datetime.timezone(tzdelta)
 
 
 class NamedItem(Item, ABC):

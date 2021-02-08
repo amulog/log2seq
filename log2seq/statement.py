@@ -343,6 +343,13 @@ class FixIP(_ActionBase):
 
     @staticmethod
     def _is_ipaddr(string, ipaddr=True, ipnet=True):
+        # fast check: no digit char, no ipaddr
+        # because ipaddress lib is slow
+        if "." not in string and ":" not in string:
+            return False
+        if not any(c.isdigit() for c in string):
+            return False
+
         if ipaddr:
             try:
                 ipaddress.ip_address(string)
@@ -350,7 +357,7 @@ class FixIP(_ActionBase):
                 pass
             else:
                 return True
-        if ipnet:
+        if ipnet and "/" in string:
             try:
                 ipaddress.ip_network(string, strict=False)
             except ValueError:
@@ -398,11 +405,43 @@ class Split(_ActionBase):
         restr = r'([' + re.escape(separators) + '])+'
         self._regex = re.compile(restr)
 
-    def _split_part(self, part, iterable_mo):
-        a_stat = np.array([_FLAG_UNKNOWN] * len(part))
+#    def _split_part(self, part, iterable_mo):
+#        a_stat = np.array([_FLAG_UNKNOWN] * len(part))
+#        for mo in iterable_mo:
+#            a_stat[mo.start():mo.end()] = _FLAG_SEPARATORS
+#        return self._get_blocks(part, a_stat)
+
+    @staticmethod
+    def _split_part(part, iterable_mo):
+        current = 0
+        length = len(part)
+        ret_parts = []
+        ret_flags = []
         for mo in iterable_mo:
-            a_stat[mo.start():mo.end()] = _FLAG_SEPARATORS
-        return self._get_blocks(part, a_stat)
+            if mo.start() > current:
+                ret_parts.append(part[current:mo.start()])
+                ret_flags.append(_FLAG_UNKNOWN)
+            ret_parts.append(part[mo.start():mo.end()])
+            ret_flags.append(_FLAG_SEPARATORS)
+            current = mo.end()
+        else:
+            if current < length:
+                ret_parts.append(part[current:length])
+                ret_flags.append(_FLAG_UNKNOWN)
+        return ret_parts, ret_flags
+
+    @staticmethod
+    def _iter_part(part, iterable_mo):
+        current = 0
+        length = len(part)
+        for mo in iterable_mo:
+            if mo.start() > current:
+                yield part[current:mo.start()], _FLAG_UNKNOWN
+            yield part[mo.start():mo.end()], _FLAG_SEPARATORS
+            current = mo.end()
+        else:
+            if current < length:
+                yield part[current:length], _FLAG_UNKNOWN
 
     def do(self, input_parts, input_flags):
         """Apply this action to all input parts.
@@ -421,9 +460,9 @@ class Split(_ActionBase):
         for part, flag in zip(input_parts, input_flags):
             if len(part) > 0 and flag == _FLAG_UNKNOWN:
                 matchobjs = self._regex.finditer(part)
-                tmp_parts, tmp_flags = self._split_part(part, matchobjs)
-                ret_parts += tmp_parts
-                ret_flags += tmp_flags
+                for tmp_part, tmp_flag in self._iter_part(part, matchobjs):
+                    ret_parts.append(tmp_part)
+                    ret_flags.append(tmp_flag)
             else:
                 ret_parts.append(part)
                 ret_flags.append(flag)

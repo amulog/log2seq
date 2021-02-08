@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import re
+import datetime
 import unittest
 
 
@@ -11,7 +12,9 @@ class TestHeader(unittest.TestCase):
             "Apr  1 02:23:45 host-name.example.org message here",
             "2020 May  2 22:22:22 192.0.2.1 message there",
             "Jun 30 11:11:11.012345+09:00 2001:db8::beef something",
+            "Jul 12 22:22:22-06:00 host something"
             "2112-09-03 11:22:33 host something failure"
+            "2112-09-03 01:02:03.987654+09:00 host something"
         ]
 
         from log2seq.preset import default
@@ -19,6 +22,20 @@ class TestHeader(unittest.TestCase):
         for line in input_lines:
             ret = hp.process_header(line)
             assert ret is not None
+
+    def test_time(self):
+        input_lines = ["2112-09-03 11:22:33.012345 host something failure"]
+
+        from log2seq.preset import default
+        hp = default()
+        for line in input_lines:
+            ret = hp.process_header(line)
+            ts = ret["timestamp"]
+            assert ts.date() == datetime.date(2112, 9, 3)
+            assert ts.time().hour == 11
+            assert ts.time().minute == 22
+            assert ts.time().second == 33
+            assert ts.time().microsecond == 12345
 
     def test_items(self):
         from log2seq import header
