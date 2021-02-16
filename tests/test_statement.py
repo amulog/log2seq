@@ -28,6 +28,16 @@ class TestStatement(unittest.TestCase):
         assert l_w == []
         assert l_s == [" "]
 
+    def test_remove(self):
+        input_mes = "a -> b"
+        statement_rules = [
+            Split(" >"),
+            Remove("[^a-zA-Z0-9]+")
+        ]
+        sp = StatementParser(statement_rules)
+        l_w, l_s = sp.process_line(input_mes)
+        assert l_w == ["a", "b"]
+
     def test_fix_partial(self):
         input_mes = "source 192.0.2.1.80 initialized."
         statement_rules = [

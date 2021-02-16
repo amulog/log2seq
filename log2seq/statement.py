@@ -377,6 +377,53 @@ class FixIP(_ActionBase):
         return input_parts, ret_flags
 
 
+class Remove(_ActionBase):
+    """Add Separator flag to matched parts.
+
+    Separator parts will be ignored by following actions.
+    Separator parts are selected by regular expression of given pattern
+    (see `re <https://docs.python.org/ja/3/library/re.html>`_).
+
+    Args:
+        patterns (str or list of str):
+            Regular expression patterns.
+            If multiple patterns are given, they are matched
+            with every word in order.
+    """
+
+    def __init__(self, patterns):
+        self._init_patterns(patterns)
+
+    def _init_patterns(self, patterns):
+        if isinstance(patterns, str):
+            self._l_regex = [re.compile(patterns)]
+        else:
+            self._l_regex = [re.compile(p) for p in patterns]
+
+    def do(self, input_parts, input_flags):
+        """Apply this action to every part.
+        Matched parts will be fixed.
+        This function works as like a filter of the statement.
+
+        Args:
+            input_parts (list of str): partially segmented statement.
+            input_flags (list of int): annotation of input_parts.
+
+        Returns:
+            tuple: same format as the input arguments.
+        """
+        ret_parts = input_parts[:]
+        ret_flags = input_flags[:]
+        for i, (s, flag) in enumerate(zip(input_parts, input_flags)):
+            if flag != _FLAG_UNKNOWN:
+                continue
+            for reobj in self._l_regex:
+                m = reobj.match(s)
+                if m:
+                    ret_flags[i] = _FLAG_SEPARATORS
+        return ret_parts, ret_flags
+
+
 class Split(_ActionBase):
     """Split statement (or its parts) by given separators.
 
