@@ -347,8 +347,6 @@ class FixIP(_ActionBase):
         # because ipaddress lib is slow
         if "." not in string and ":" not in string:
             return False
-        if not any(c.isdigit() for c in string):
-            return False
 
         if ipaddr:
             try:
