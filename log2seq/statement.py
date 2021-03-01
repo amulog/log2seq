@@ -114,17 +114,31 @@ class _ActionBase(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def _get_blocks(part, a_char_flags):
-        # get blocks of continuous same flags
-        ret_parts = []
-        ret_flags = []
-        changeidx = np.where(np.diff(a_char_flags) != 0)[0] + 1
-        iterobj = zip(np.append(np.array([0]), changeidx),
-                      np.append(changeidx, np.array(len(part))))
-        for new_part_start, new_part_end in iterobj:
-            ret_parts.append(part[new_part_start:new_part_end])
-            ret_flags.append(a_char_flags[new_part_start])
-        return ret_parts, ret_flags
+    def _separate_multiple_match(part, iterable_mo, label_match, label_other):
+        current = 0
+        length = len(part)
+        for mo in iterable_mo:
+            if mo.start() > current:
+                yield part[current:mo.start()], label_other
+            yield part[mo.start():mo.end()], label_match
+            current = mo.end()
+        else:
+            if current < length:
+                yield part[current:length], label_other
+
+    @staticmethod
+    def _separate_partial_match(part, mo, match_groups, label_match, label_other):
+        current = 0
+        length = len(part)
+        sorted_match_groups = sorted(match_groups, key=lambda x: mo.start(x))
+        for match_group in sorted_match_groups:
+            if mo.start(match_group) > current:
+                yield part[current:mo.start(match_group)], label_other
+            yield part[mo.start(match_group):mo.end(match_group)], label_match
+            current = mo.end(match_group)
+        else:
+            if current < length:
+                yield part[current:length], label_other
 
 
 class Fix(_ActionBase):
@@ -186,10 +200,8 @@ class _FixPartialBase(Fix, ABC):
     _fix_groups = None
 
     def _fix_partially(self, part, mo):
-        a_stat = np.array([self._rest_flag] * len(part))
-        for fix_group in self._fix_groups:
-            a_stat[mo.start(fix_group):mo.end(fix_group)] = _FLAG_FIXED
-        return self._get_blocks(part, a_stat)
+        return self._separate_partial_match(part, mo, self._fix_groups,
+                                            _FLAG_FIXED, _FLAG_UNKNOWN)
 
     def do(self, input_parts, input_flags):
         ret_parts = []
@@ -201,9 +213,12 @@ class _FixPartialBase(Fix, ABC):
                 mo = reobj.match(part)
                 if mo:
                     # separate part into fixed and others
-                    tmp_parts, tmp_flags = self._fix_partially(part, mo)
-                    ret_parts += tmp_parts
-                    ret_flags += tmp_flags
+                    for tmp_part, tmp_flag in self._fix_partially(part, mo):
+                        ret_parts.append(tmp_part)
+                        ret_flags.append(tmp_flag)
+                    # tmp_parts, tmp_flags = self._fix_partially(part, mo)
+                    # ret_parts += tmp_parts
+                    # ret_flags += tmp_flags
                 else:
                     # leave as is
                     ret_parts.append(part)
@@ -456,37 +471,28 @@ class Split(_ActionBase):
 #            a_stat[mo.start():mo.end()] = _FLAG_SEPARATORS
 #        return self._get_blocks(part, a_stat)
 
-    @staticmethod
-    def _split_part(part, iterable_mo):
-        current = 0
-        length = len(part)
-        ret_parts = []
-        ret_flags = []
-        for mo in iterable_mo:
-            if mo.start() > current:
-                ret_parts.append(part[current:mo.start()])
-                ret_flags.append(_FLAG_UNKNOWN)
-            ret_parts.append(part[mo.start():mo.end()])
-            ret_flags.append(_FLAG_SEPARATORS)
-            current = mo.end()
-        else:
-            if current < length:
-                ret_parts.append(part[current:length])
-                ret_flags.append(_FLAG_UNKNOWN)
-        return ret_parts, ret_flags
+#    @staticmethod
+#    def _split_part(part, iterable_mo):
+#        current = 0
+#        length = len(part)
+#        ret_parts = []
+#        ret_flags = []
+#        for mo in iterable_mo:
+#            if mo.start() > current:
+#                ret_parts.append(part[current:mo.start()])
+#                ret_flags.append(_FLAG_UNKNOWN)
+#            ret_parts.append(part[mo.start():mo.end()])
+#            ret_flags.append(_FLAG_SEPARATORS)
+#            current = mo.end()
+#        else:
+#            if current < length:
+#                ret_parts.append(part[current:length])
+#                ret_flags.append(_FLAG_UNKNOWN)
+#        return ret_parts, ret_flags
 
-    @staticmethod
-    def _iter_part(part, iterable_mo):
-        current = 0
-        length = len(part)
-        for mo in iterable_mo:
-            if mo.start() > current:
-                yield part[current:mo.start()], _FLAG_UNKNOWN
-            yield part[mo.start():mo.end()], _FLAG_SEPARATORS
-            current = mo.end()
-        else:
-            if current < length:
-                yield part[current:length], _FLAG_UNKNOWN
+    def _iter_part(self, part, iterable_mo):
+        return self._separate_multiple_match(part, iterable_mo,
+                                             _FLAG_SEPARATORS, _FLAG_UNKNOWN)
 
     def do(self, input_parts, input_flags):
         """Apply this action to all input parts.

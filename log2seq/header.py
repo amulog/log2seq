@@ -84,7 +84,7 @@ class HeaderParser(_HeaderParserBase):
     Item is a component of regular expression patterns
     to parse corresponding variable item.
     HeaderParser automatically generate one regular expression pattern
-    from the items, and test that it matchs with input log messages.
+    from the items, and tests that it matchs with input log messages.
     If matched, HeaderParser extracts variables for the items.
 
     In HeaderParser rule, one :class:`Statement` item is mandatory.

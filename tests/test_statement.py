@@ -29,7 +29,7 @@ class TestStatement(unittest.TestCase):
         assert l_s == [" "]
 
     def test_ipaddr(self):
-        input_mes = "test: src :: is not link-local"
+        input_mes = "tests: src :: is not link-local"
         statement_rules = [
             Split(" "),
             FixIP(),
@@ -37,7 +37,7 @@ class TestStatement(unittest.TestCase):
         ]
         sp = StatementParser(statement_rules)
         l_w, l_s = sp.process_line(input_mes)
-        assert l_w == ["test", "src", "::", "is", "not", "link-local"]
+        assert l_w == ["tests", "src", "::", "is", "not", "link-local"]
 
     def test_remove(self):
         input_mes = "a -> b"
