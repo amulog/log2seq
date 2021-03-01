@@ -3,7 +3,6 @@
 import re
 from abc import ABC, abstractmethod
 import ipaddress
-import numpy as np
 
 from . import _common
 
@@ -36,10 +35,10 @@ class StatementParser:
         self._l_act = actions
 
     @staticmethod
-    def _verbose(act, input_parts, input_flags):
+    def _verbose(act, input_parts):
         act_name = act.__class__.__name__
         words = []
-        for part, flag in zip(input_parts, input_flags):
+        for part, flag in input_parts:
             if flag == _FLAG_FIXED:
                 words.append("#" + part + "#")
             elif flag == _FLAG_UNKNOWN:
@@ -49,11 +48,11 @@ class StatementParser:
         print("{0}: {1}".format(act_name, ", ".join(words)))
 
     @staticmethod
-    def _separate(input_parts, input_flags):
+    def _separate(iterable_parts):
         l_w = []
         l_s = []
         prev_isword = True
-        for i, (part, flag) in enumerate(zip(input_parts, input_flags)):
+        for part, flag in iterable_parts:
             current_isword = flag in (_FLAG_FIXED, _FLAG_UNKNOWN)
             if current_isword:
                 if part == "":
@@ -97,20 +96,20 @@ class StatementParser:
         """
         if verbose:
             print("Statement: {0}".format(statement))
-        parts = [statement]
-        flags = [_FLAG_UNKNOWN]
+        iterable_parts = [(statement, _FLAG_UNKNOWN), ]
 
         for act in self._l_act:
-            parts, flags = act.do(parts, flags)
+            iterable_parts = act.do(iterable_parts)
             if verbose:
-                self._verbose(act, parts, flags)
-        return self._separate(parts, flags)
+                iterable_parts = list(iterable_parts)
+                self._verbose(act, iterable_parts)
+        return self._separate(iterable_parts)
 
 
 class _ActionBase(ABC):
 
     @abstractmethod
-    def do(self, input_parts, input_flags):
+    def do(self, input_parts):
         raise NotImplementedError
 
     @staticmethod
@@ -132,6 +131,8 @@ class _ActionBase(ABC):
         length = len(part)
         sorted_match_groups = sorted(match_groups, key=lambda x: mo.start(x))
         for match_group in sorted_match_groups:
+            if mo.start(match_group) == -1:
+                continue
             if mo.start(match_group) > current:
                 yield part[current:mo.start(match_group)], label_other
             yield part[mo.start(match_group):mo.end(match_group)], label_match
@@ -169,64 +170,61 @@ class Fix(_ActionBase):
         else:
             self._l_regex = [re.compile(p) for p in patterns]
 
-    def do(self, input_parts, input_flags):
+    def do(self, iterable_parts):
         """Apply this action to every part.
         Matched parts will be fixed.
         This function works as like a filter of the statement.
 
         Args:
-            input_parts (list of str): partially segmented statement.
-            input_flags (list of int): annotation of input_parts.
+            iterable_parts (iterator of tuple): Sequence of tuples,
+                including segmented statement and its annotation label.
 
-        Returns:
+        Yields:
             tuple: same format as the input arguments.
         """
-        ret_parts = input_parts[:]
-        ret_flags = input_flags[:]
-        for i, (s, flag) in enumerate(zip(input_parts, input_flags)):
+        for s, flag in iterable_parts:
             if flag != _FLAG_UNKNOWN:
-                continue
-            for reobj in self._l_regex:
-                m = reobj.match(s)
-                if m:
-                    ret_flags[i] = _FLAG_FIXED
-        return ret_parts, ret_flags
+                # FIXED or SEPARATOR -> as is
+                yield s, flag
+            else:
+                for reobj in self._l_regex:
+                    m = reobj.match(s)
+                    if m:
+                        # match -> flag changed to FIXED
+                        yield s, _FLAG_FIXED
+                        break
+                else:
+                    # not match -> as is
+                    yield s, flag
 
 
-class _FixPartialBase(Fix, ABC):
+class _PartialActionBase(Fix, ABC):
 
     # private attributes for child classes
     _rest_flag = None
     _fix_groups = None
 
-    def _fix_partially(self, part, mo):
-        return self._separate_partial_match(part, mo, self._fix_groups,
-                                            _FLAG_FIXED, _FLAG_UNKNOWN)
+    def _separate_partial(self, part, mo):
+        raise NotImplementedError
 
-    def do(self, input_parts, input_flags):
-        ret_parts = []
-        ret_flags = []
-        for part, flag in zip(input_parts, input_flags):
+    def do(self, iterable_parts):
+        for part, flag in iterable_parts:
             if flag != _FLAG_UNKNOWN:
-                continue
-            for reobj in self._l_regex:
-                mo = reobj.match(part)
-                if mo:
-                    # separate part into fixed and others
-                    for tmp_part, tmp_flag in self._fix_partially(part, mo):
-                        ret_parts.append(tmp_part)
-                        ret_flags.append(tmp_flag)
-                    # tmp_parts, tmp_flags = self._fix_partially(part, mo)
-                    # ret_parts += tmp_parts
-                    # ret_flags += tmp_flags
-                else:
-                    # leave as is
-                    ret_parts.append(part)
-                    ret_flags.append(flag)
-        return ret_parts, ret_flags
+                # FIXED or SEPARATOR -> as is
+                yield part, flag
+            else:
+                for reobj in self._l_regex:
+                    mo = reobj.match(part)
+                    if mo:
+                        # match -> separate matched part and others
+                        for p in self._separate_partial(part, mo):
+                            yield p
+                    else:
+                        # not match -> as is
+                        yield part, flag
 
 
-class FixPartial(_FixPartialBase):
+class FixPartial(_PartialActionBase):
     """Extended Fix action to accept complicated patterns.
 
     Usual :class:`Fix` consider the matched part as a word, and fix it.
@@ -292,8 +290,12 @@ class FixPartial(_FixPartialBase):
         else:
             self._rest_flag = _FLAG_UNKNOWN
 
+    def _separate_partial(self, part, mo):
+        return self._separate_partial_match(part, mo, self._fix_groups,
+                                            _FLAG_FIXED, self._rest_flag)
 
-class FixParenthesis(_FixPartialBase):
+
+class FixParenthesis(_PartialActionBase):
     """Extended FixPartial easily used to fix strings between parenthesis.
 
     The basic usage is similar to FixPartial, but
@@ -340,6 +342,10 @@ class FixParenthesis(_FixPartialBase):
                 re.escape(p_right) + r'.*$'
         return re.compile(restr)
 
+    def _separate_partial(self, part, mo):
+        return self._separate_partial_match(part, mo, self._fix_groups,
+                                            _FLAG_FIXED, _FLAG_UNKNOWN)
+
 
 class FixIP(_ActionBase):
     """Add Fixed flag to parts of IP addresses.
@@ -379,15 +385,19 @@ class FixIP(_ActionBase):
                 return True
         return False
 
-    def do(self, input_parts, input_flags):
+    def do(self, iterable_parts):
         """same as Fix.do"""
-        ret_flags = input_flags[:]
-        for i, (s, flag) in enumerate(zip(input_parts, input_flags)):
+        for s, flag in iterable_parts:
             if flag != _FLAG_UNKNOWN:
-                continue
-            if self._is_ipaddr(s, self._test_addr, self._test_net):
-                ret_flags[i] = _FLAG_FIXED
-        return input_parts, ret_flags
+                # FIXED or SEPARATOR -> as is
+                yield s, flag
+            else:
+                if self._is_ipaddr(s, self._test_addr, self._test_net):
+                    # match -> flag changed to FIXED
+                    yield s, _FLAG_FIXED
+                else:
+                    # not match -> as is
+                    yield s, flag
 
 
 class Remove(_ActionBase):
@@ -413,28 +423,61 @@ class Remove(_ActionBase):
         else:
             self._l_regex = [re.compile(p) for p in patterns]
 
-    def do(self, input_parts, input_flags):
+    def do(self, iterable_parts):
         """Apply this action to every part.
         Matched parts will be fixed.
         This function works as like a filter of the statement.
 
         Args:
-            input_parts (list of str): partially segmented statement.
-            input_flags (list of int): annotation of input_parts.
+            iterable_parts (iterator of tuple): Sequence of tuples,
+                including segmented statement and its annotation label.
 
-        Returns:
+        Yields:
             tuple: same format as the input arguments.
         """
-        ret_parts = input_parts[:]
-        ret_flags = input_flags[:]
-        for i, (s, flag) in enumerate(zip(input_parts, input_flags)):
+        for s, flag in iterable_parts:
             if flag != _FLAG_UNKNOWN:
-                continue
-            for reobj in self._l_regex:
-                m = reobj.match(s)
-                if m:
-                    ret_flags[i] = _FLAG_SEPARATORS
-        return ret_parts, ret_flags
+                # FIXED or SEPARATOR -> as is
+                yield s, flag
+            else:
+                for reobj in self._l_regex:
+                    m = reobj.match(s)
+                    if m:
+                        # match -> flag changed to SEPARATORS
+                        yield s, _FLAG_SEPARATORS
+                        break
+                else:
+                    # not match -> as is
+                    yield s, flag
+
+
+class RemovePartial(_PartialActionBase):
+    """Extended Remove action to accept complicated patterns.
+
+    Usual :class:`Remove` consider the matched part as a separator.
+    In contrast, :class:`RemovePartial` allow
+    partially removing separators from a word.
+
+    Example:
+        >>> rpattern = r'^.*([^:](?P<colon>:))$'
+        >>> fpattern = r'^\\d{2}:\\d{2}:\\d{2}\\.\\d{3}$'
+        >>> rules = [Split(" "), RemovePartial(rpattern, remove_groups=["colon"]), Fix(fpattern), Split(":")]
+        >>> parser = StatementParser(rules)
+        >>> parser.process_line("2000 Mar 4 12:34:56.789: message: duplicated header")
+        (['2000', 'Mar', '4', '12:34:56.789', 'duplicated', 'header'], ['', ' ', ' ', ' ', ': ', ' ', ''])
+    """
+
+    def __init__(self, patterns, remove_groups):
+        super().__init__(patterns)
+
+        if isinstance(remove_groups, str):
+            self._match_groups = [remove_groups]
+        else:
+            self._match_groups = remove_groups
+
+    def _separate_partial(self, part, mo):
+        return self._separate_partial_match(part, mo, self._match_groups,
+                                            _FLAG_SEPARATORS, _FLAG_UNKNOWN)
 
 
 class Split(_ActionBase):
@@ -465,56 +508,35 @@ class Split(_ActionBase):
         restr = r'([' + re.escape(separators) + '])+'
         self._regex = re.compile(restr)
 
-#    def _split_part(self, part, iterable_mo):
-#        a_stat = np.array([_FLAG_UNKNOWN] * len(part))
-#        for mo in iterable_mo:
-#            a_stat[mo.start():mo.end()] = _FLAG_SEPARATORS
-#        return self._get_blocks(part, a_stat)
+    @staticmethod
+    def _iter_part(part, iterable_mo):
+        current = 0
+        length = len(part)
+        for mo in iterable_mo:
+            if mo.start() > current:
+                yield part[current:mo.start()], _FLAG_UNKNOWN
+            yield part[mo.start():mo.end()], _FLAG_SEPARATORS
+            current = mo.end()
+        else:
+            if current < length:
+                yield part[current:length], _FLAG_UNKNOWN
 
-#    @staticmethod
-#    def _split_part(part, iterable_mo):
-#        current = 0
-#        length = len(part)
-#        ret_parts = []
-#        ret_flags = []
-#        for mo in iterable_mo:
-#            if mo.start() > current:
-#                ret_parts.append(part[current:mo.start()])
-#                ret_flags.append(_FLAG_UNKNOWN)
-#            ret_parts.append(part[mo.start():mo.end()])
-#            ret_flags.append(_FLAG_SEPARATORS)
-#            current = mo.end()
-#        else:
-#            if current < length:
-#                ret_parts.append(part[current:length])
-#                ret_flags.append(_FLAG_UNKNOWN)
-#        return ret_parts, ret_flags
-
-    def _iter_part(self, part, iterable_mo):
-        return self._separate_multiple_match(part, iterable_mo,
-                                             _FLAG_SEPARATORS, _FLAG_UNKNOWN)
-
-    def do(self, input_parts, input_flags):
+    def do(self, iterable_parts):
         """Apply this action to all input parts.
         This function works as like a filter of the statement.
         This method function is used by StatementParser.
 
         Args:
-            input_parts (list of str): partially segmented statement.
-            input_flags (list of int): annotation of input_parts.
+            iterable_parts (iterator of tuple): Sequence of tuples,
+                including segmented statement and its annotation label.
 
-        Returns:
+        Yields:
             tuple: same format as the input arguments.
         """
-        ret_parts = []
-        ret_flags = []
-        for part, flag in zip(input_parts, input_flags):
+        for part, flag in iterable_parts:
             if len(part) > 0 and flag == _FLAG_UNKNOWN:
                 matchobjs = self._regex.finditer(part)
-                for tmp_part, tmp_flag in self._iter_part(part, matchobjs):
-                    ret_parts.append(tmp_part)
-                    ret_flags.append(tmp_flag)
+                for tmp_parts in self._iter_part(part, matchobjs):
+                    yield tmp_parts
             else:
-                ret_parts.append(part)
-                ret_flags.append(flag)
-        return ret_parts, ret_flags
+                yield part, flag

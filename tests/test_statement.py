@@ -70,3 +70,19 @@ class TestStatement(unittest.TestCase):
         sp = StatementParser(statement_rules)
         l_w, l_s = sp.process_line(input_mes)
         assert l_w == ["comment", "added", "This is a comment description"]
+
+    def test_remove_partial(self):
+        input_mes = "2000 Mar 4 12:34:56.789: host: :: and 127.0.0.1 duplicated timestamp given."
+        statement_rules = [
+            Split(" "),
+            RemovePartial(r'^.*([^:](?P<colon>:))|([^.](?P<dot>\.))$',
+                          remove_groups=["colon", "dot"]),
+            Fix(r'^\d{2}:\d{2}:\d{2}\.\d{3}$'),
+            FixIP(),
+            Split(":.")
+        ]
+        sp = StatementParser(statement_rules)
+        l_w, l_s = sp.process_line(input_mes)
+        assert l_w == ["2000", "Mar", "4", "12:34:56.789",
+                       "host", "::", "and", "127.0.0.1", "duplicated", "timestamp", "given"]
+
