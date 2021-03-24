@@ -113,6 +113,19 @@ class _ActionBase(ABC):
         raise NotImplementedError
 
     @staticmethod
+    def _is_active_part(s, flag):
+        # UNKNOWN -> true (to be processed)
+        # FIXED or SEPARATOR -> false (as is)
+        return len(s) > 0 and flag == _FLAG_UNKNOWN
+
+    @staticmethod
+    def _standard_patterns(patterns):
+        if isinstance(patterns, str):
+            return [re.compile(patterns)]
+        else:
+            return [re.compile(p) for p in patterns]
+
+    @staticmethod
     def _separate_multiple_match(part, iterable_mo, label_match, label_other):
         current = 0
         length = len(part)
@@ -165,10 +178,15 @@ class Fix(_ActionBase):
         self._init_patterns(patterns)
 
     def _init_patterns(self, patterns):
-        if isinstance(patterns, str):
-            self._l_regex = [re.compile(patterns)]
+        self._l_regex = self._standard_patterns(patterns)
+
+    def _test_match_pattern(self, s):
+        for reobj in self._l_regex:
+            m = reobj.match(s)
+            if m:
+                return True
         else:
-            self._l_regex = [re.compile(p) for p in patterns]
+            return False
 
     def do(self, iterable_parts):
         """Apply this action to every part.
@@ -183,45 +201,47 @@ class Fix(_ActionBase):
             tuple: same format as the input arguments.
         """
         for s, flag in iterable_parts:
-            if flag != _FLAG_UNKNOWN:
-                # FIXED or SEPARATOR -> as is
+            if not self._is_active_part(s, flag):
                 yield s, flag
+            elif self._test_match_pattern(s):
+                yield s, _FLAG_FIXED
             else:
-                for reobj in self._l_regex:
-                    m = reobj.match(s)
-                    if m:
-                        # match -> flag changed to FIXED
-                        yield s, _FLAG_FIXED
-                        break
-                else:
-                    # not match -> as is
-                    yield s, flag
+                yield s, flag
 
 
-class _PartialActionBase(Fix, ABC):
+class _PartialActionBase(_ActionBase, ABC):
 
     # private attributes for child classes
+    _l_regex = None
     _rest_flag = None
     _fix_groups = None
 
+    def __init__(self, patterns):
+        self._init_patterns(patterns)
+
+    @abstractmethod
+    def _init_patterns(self, patterns):
+        raise NotImplementedError
+
+    @abstractmethod
     def _separate_partial(self, part, mo):
         raise NotImplementedError
 
     def do(self, iterable_parts):
-        for part, flag in iterable_parts:
-            if flag != _FLAG_UNKNOWN:
-                # FIXED or SEPARATOR -> as is
-                yield part, flag
-            else:
+        for s, flag in iterable_parts:
+            if self._is_active_part(s, flag):
                 for reobj in self._l_regex:
-                    mo = reobj.match(part)
+                    mo = reobj.match(s)
                     if mo:
                         # match -> separate matched part and others
-                        for p in self._separate_partial(part, mo):
+                        for p in self._separate_partial(s, mo):
                             yield p
-                    else:
-                        # not match -> as is
-                        yield part, flag
+                        # other patterns are ignored for this part
+                        break
+                else:
+                    yield s, flag
+            else:
+                yield s, flag
 
 
 class FixPartial(_PartialActionBase):
@@ -260,9 +280,9 @@ class FixPartial(_PartialActionBase):
         (['comment', 'added', 'This is a comment description'], ['', ' ', ': "', '".'])
 
     Args:
-        patterns (str or list of str): Regular expression patterns.
+        patterns (str): Regular expression patterns.
             If multiple patterns given, the first matched pattern
-            is used to Fix the part.
+            is used to Fix the part (other patterns are ignored).
         fix_groups (str or list of str): Name groups in the patterns to fix.
             e.g., ["ipaddr", "port"] for Usecase 1.
             Unspecified groups are not fixed,
@@ -289,6 +309,9 @@ class FixPartial(_PartialActionBase):
             self._rest_flag = _FLAG_SEPARATORS
         else:
             self._rest_flag = _FLAG_UNKNOWN
+
+    def _init_patterns(self, patterns):
+        self._l_regex = self._standard_patterns(patterns)
 
     def _separate_partial(self, part, mo):
         return self._separate_partial_match(part, mo, self._fix_groups,
@@ -324,17 +347,17 @@ class FixParenthesis(_PartialActionBase):
 
     def _init_patterns(self, patterns):
         if isinstance(patterns, str):
-            self._l_regex = [self._init_pattern(patterns)]
+            self._l_regex = [self._init_named_pattern(patterns)]
         elif len(patterns) == 2 and isinstance(patterns[0], str):
-            self._l_regex = [self._init_pattern(patterns)]
+            self._l_regex = [self._init_named_pattern(patterns)]
         else:
-            self._l_regex = [self._init_pattern(pattern)
+            self._l_regex = [self._init_named_pattern(pattern)
                              for pattern in patterns]
 
     @classmethod
-    def _init_pattern(cls, parent_pattern):
+    def _init_named_pattern(cls, parent_pattern):
         # non-greedy match
-        assert len(parent_pattern) == 2
+        assert len(parent_pattern) == 2, "Invalid pattern for FixParenthesis"
         p_left = parent_pattern[0]
         p_right = parent_pattern[1]
         restr = r'^.*?' + re.escape(p_left) + \
@@ -385,19 +408,21 @@ class FixIP(_ActionBase):
                 return True
         return False
 
+    def _test_match_pattern(self, s):
+        return self._is_ipaddr(s, self._test_addr, self._test_net)
+
     def do(self, iterable_parts):
         """same as Fix.do"""
         for s, flag in iterable_parts:
-            if flag != _FLAG_UNKNOWN:
+            if not self._is_active_part(s, flag):
                 # FIXED or SEPARATOR -> as is
                 yield s, flag
+            elif self._test_match_pattern(s):
+                # match -> flag changed to FIXED
+                yield s, _FLAG_FIXED
             else:
-                if self._is_ipaddr(s, self._test_addr, self._test_net):
-                    # match -> flag changed to FIXED
-                    yield s, _FLAG_FIXED
-                else:
-                    # not match -> as is
-                    yield s, flag
+                # not match -> as is
+                yield s, flag
 
 
 class Remove(_ActionBase):
@@ -418,10 +443,15 @@ class Remove(_ActionBase):
         self._init_patterns(patterns)
 
     def _init_patterns(self, patterns):
-        if isinstance(patterns, str):
-            self._l_regex = [re.compile(patterns)]
+        self._l_regex = self._standard_patterns(patterns)
+
+    def _test_match_pattern(self, s):
+        for reobj in self._l_regex:
+            m = reobj.match(s)
+            if m:
+                return True
         else:
-            self._l_regex = [re.compile(p) for p in patterns]
+            return False
 
     def do(self, iterable_parts):
         """Apply this action to every part.
@@ -436,19 +466,12 @@ class Remove(_ActionBase):
             tuple: same format as the input arguments.
         """
         for s, flag in iterable_parts:
-            if flag != _FLAG_UNKNOWN:
-                # FIXED or SEPARATOR -> as is
+            if not self._is_active_part(s, flag):
                 yield s, flag
+            elif self._test_match_pattern(s):
+                yield s, _FLAG_SEPARATORS
             else:
-                for reobj in self._l_regex:
-                    m = reobj.match(s)
-                    if m:
-                        # match -> flag changed to SEPARATORS
-                        yield s, _FLAG_SEPARATORS
-                        break
-                else:
-                    # not match -> as is
-                    yield s, flag
+                yield s, flag
 
 
 class RemovePartial(_PartialActionBase):
@@ -474,6 +497,9 @@ class RemovePartial(_PartialActionBase):
             self._match_groups = [remove_groups]
         else:
             self._match_groups = remove_groups
+
+    def _init_patterns(self, patterns):
+        self._l_regex = self._standard_patterns(patterns)
 
     def _separate_partial(self, part, mo):
         return self._separate_partial_match(part, mo, self._match_groups,
@@ -509,17 +535,17 @@ class Split(_ActionBase):
         self._regex = re.compile(restr)
 
     @staticmethod
-    def _iter_part(part, iterable_mo):
+    def _iter_part(s, iterable_mo):
         current = 0
-        length = len(part)
+        length = len(s)
         for mo in iterable_mo:
             if mo.start() > current:
-                yield part[current:mo.start()], _FLAG_UNKNOWN
-            yield part[mo.start():mo.end()], _FLAG_SEPARATORS
+                yield s[current:mo.start()], _FLAG_UNKNOWN
+            yield s[mo.start():mo.end()], _FLAG_SEPARATORS
             current = mo.end()
         else:
             if current < length:
-                yield part[current:length], _FLAG_UNKNOWN
+                yield s[current:length], _FLAG_UNKNOWN
 
     def do(self, iterable_parts):
         """Apply this action to all input parts.
@@ -533,10 +559,28 @@ class Split(_ActionBase):
         Yields:
             tuple: same format as the input arguments.
         """
-        for part, flag in iterable_parts:
-            if len(part) > 0 and flag == _FLAG_UNKNOWN:
-                matchobjs = self._regex.finditer(part)
-                for tmp_parts in self._iter_part(part, matchobjs):
+        for s, flag in iterable_parts:
+            if self._is_active_part(s, flag):
+                matchobjs = self._regex.finditer(s)
+                for tmp_parts in self._iter_part(s, matchobjs):
                     yield tmp_parts
             else:
-                yield part, flag
+                yield s, flag
+
+
+class ConditionalSplit(Fix, Split):
+
+    def __init__(self, patterns, separators):
+        Fix.__init__(self, patterns)
+        Split.__init__(self, separators)
+
+    def do(self, iterable_parts):
+        for s, flag in iterable_parts:
+            if not self._is_active_part(s, flag):
+                yield s, flag
+            elif self._test_match_pattern(s):
+                matchobjs = self._regex.finditer(s)
+                for tmp_parts in self._iter_part(s, matchobjs):
+                    yield tmp_parts
+            else:
+                yield s, flag

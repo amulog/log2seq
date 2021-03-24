@@ -75,14 +75,28 @@ class TestStatement(unittest.TestCase):
         input_mes = "2000 Mar 4 12:34:56.789: host: :: and 127.0.0.1 duplicated timestamp given."
         statement_rules = [
             Split(" "),
-            RemovePartial(r'^.*([^:](?P<colon>:))|([^.](?P<dot>\.))$',
-                          remove_groups=["colon", "dot"]),
+            RemovePartial(r'^.*[^:](?P<colon>:)$',
+                          remove_groups=["colon"]),
+            RemovePartial(r'^.*[^.](?P<dot>\.)$',
+                          remove_groups=["dot"]),
             Fix(r'^\d{2}:\d{2}:\d{2}\.\d{3}$'),
             FixIP(),
-            Split(":.")
+            Split(":")
         ]
         sp = StatementParser(statement_rules)
         l_w, l_s = sp.process_line(input_mes)
         assert l_w == ["2000", "Mar", "4", "12:34:56.789",
                        "host", "::", "and", "127.0.0.1", "duplicated", "timestamp", "given"]
 
+    def test_conditional_split(self):
+        input_mes = "%KERNEL-4-EVENT-7: host h1-i2.example.org scored -0.035 value (20.0%)"
+        statement_rules = [
+            Split(" ()"),
+            RemovePartial(r'^.*[^:](?P<colon>:)$',
+                          remove_groups=["colon"]),
+            ConditionalSplit(r'^%[A-Z]+-\d+(-[A-Z]+-\d+)?$', r'%-')
+        ]
+        sp = StatementParser(statement_rules)
+        l_w, l_s = sp.process_line(input_mes)
+        assert l_w == ["KERNEL", "4", "EVENT", "7", "host", "h1-i2.example.org",
+                       "scored", "-0.035", "value", "20.0%"]
