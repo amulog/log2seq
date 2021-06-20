@@ -14,9 +14,9 @@ log2seq
    :alt: BSD 3-Clause License
    :target: https://opensource.org/licenses/BSD-3-Clause
 
-.. image:: https://travis-ci.org/cpflat/log2seq.svg?branch=master
+.. image:: https://travis-ci.com/cpflat/log2seq.svg?branch=master
    :alt: Travis CI
-   :target: https://travis-ci.org/github/cpflat/log2seq
+   :target: https://travis-ci.com/github/cpflat/log2seq
 
 .. image:: https://readthedocs.org/projects/log2seq/badge/?version=latest
    :alt: Documentation Status
