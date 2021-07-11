@@ -112,10 +112,26 @@ class HeaderParser(_HeaderParserBase):
     Note that "year" is missing in some logging framework
     (e.g., default syslogd configuration).
 
+    There are two options to define the placement of Items.
+    One is "separator", which is an easier (and recommended) option.
+    Separator defines separator characters between Items.
+    The other is "full_format",
+    which is similar to log_format in logparser[1].
+    It is a regular expression holed with Item replacers.
+    For example, if full_format is r"<0> <1> <2> \\[<3>\\] <4>",
+    <0> will be replaced with the first :class:`Item` in items.
+    If you need "<" and ">", escape it with a backslash.
+    The number of replacers must be equal to the length of items.
+    Note that optional Items must be manually enclosed with "(" and ")?"
+    in the full_format regular expression.
+    (e.g., r"<0> <1> <2> (\\[<3>\\] )?<4>" where Item-3 is optional.)
+
     Args:
         items (list of :class:`Item`): header format rule.
         separator (str, optional): Separators for header part.
             Defaults to white spaces.
+        full_format (str, optional): Place format of header part.
+            If given, argument separator is ignored.
         defaults (dict, optional): Default values, used for
             missing values (for optional or missing items) in log messages.
         reformat_timestamp (bool, optional): Transform time-related
@@ -124,46 +140,78 @@ class HeaderParser(_HeaderParserBase):
         astimezone (datetime.tzinfo, optional): Convert timestamp to
             given new timezone by calling datetime.datetime.astimezone().
             Effective only when reformat_timestamp is True.
+
+    Reference:
+        [1] logparser: https://github.com/logpai/logparser
+
     """
     _STATEMENT_FOOTER = r'(?P<' + _KEY_STATEMENT + '>.*)'
 
-    def __init__(self, items, separator=None, **kwargs):
+    def __init__(self, items, separator=None, full_format=None, **kwargs):
         super().__init__(**kwargs)
         self._l_item = items
-        self._separator = separator
 
-        self._statement_check()
-        self._duplication_check()
+        self._statement_check(items)
+        self._duplication_check(items)
 
-        self._make_regex()
+        if full_format:
+            self._reobj = self._make_regex_full_format(items, full_format)
+        else:
+            self._reobj = self._make_regex_separator(items, separator)
 
-    def _statement_check(self):
-        names = [item.value_name for item in self._l_item]
+    @property
+    def pattern(self):
+        return self._reobj
+
+    @staticmethod
+    def _statement_check(items):
+        names = [item.value_name for item in items]
         if _KEY_STATEMENT not in names:
             msg = "Statement Item is needed"
             raise _common.ParserDefinitionError(msg)
 
-    def _duplication_check(self):
-        names = [item.match_name for item in self._l_item
+    @staticmethod
+    def _duplication_check(items):
+        names = [item.match_name for item in items
                  if not item.dummy]
         if len(names) > len(set(names)):
             msg = "Given items include duplicated match names"
             raise _common.ParserDefinitionError(msg)
 
-    def _separator_regex(self):
-        if self._separator is None:
-            return r'\s+'
+    @staticmethod
+    def _make_regex_separator(items, separator):
+        if separator is None:
+            sep = r'\s+'
         else:
-            return r'[' + self._separator + ']+'
+            sep = r'[' + separator + ']+'
 
-    def _make_regex(self):
-        sep = self._separator_regex()
         l_item_regex = []
-        for i, item in enumerate(self._l_item):
-            last = (i == len(self._l_item) - 1)
-            l_item_regex.append(item.get_regex(separator=sep, last=last))
-        restr = r'^' + "".join(l_item_regex) + '$'
-        self._reobj = re.compile(restr)
+        for i, item in enumerate(items):
+            if i == len(items) - 1:
+                # last item: no separator
+                restr = item.get_regex(separator=None)
+            else:
+                # others: with separator
+                # (if the item is optional,
+                # the separator is included in the optional part)
+                restr = item.get_regex(separator=sep)
+            l_item_regex.append(restr)
+        restr = '^' + "".join(l_item_regex) + '$'
+        return re.compile(restr)
+
+    @staticmethod
+    def _make_regex_full_format(items, full_format):
+        tmp_format = re.sub(" +", r"\\s+", full_format)
+        for i, item in reversed(list(enumerate(items))):
+            replacer = "<" + str(i) + ">"
+            item_regex = item.get_regex(separator=None)
+            if replacer not in tmp_format:
+                msg = "Invalid full_format pattern"
+                raise _common.ParserDefinitionError(msg)
+            tmp_format = tmp_format.replace(replacer, item_regex, 1)
+
+        restr = '^' + tmp_format + '$'
+        return re.compile(restr)
 
     def process_line(self, line):
         """Parse header part of a log message (i.e., a line).
@@ -251,7 +299,7 @@ class Item(ABC):
         """
         return self._value_name
 
-    def get_regex(self, separator=r'\s+', last=False):
+    def get_regex(self, separator=None):
         """Get regular expression pattern of this :class:`Item` instance
         in string format.
         The pattern is modified considering the options
@@ -259,20 +307,20 @@ class Item(ABC):
 
         Args:
             separator (str, optional): separator regular expression pattern.
-            last (bool, optional): True if this Item instance is the last one
-                in :class:`HeaderParser` items.
+                If given, it follows the main pattern.
 
         Returns:
             str: regular expression pattern of this Item instance.
         """
-        return self._enclose_regex(self.pattern, separator, last)
 
-    def _enclose_regex(self, core, separator, last):
+        return self._enclose_regex(self.pattern, separator)
+
+    def _enclose_regex(self, core, separator):
         if self._dummy:
             restr = core
         else:
             restr = r'(?P<' + self.match_name + r'>' + core + ')'
-        if not last:
+        if separator is not None:
             restr += separator
         if self._optional:
             restr = r'(' + restr + ')?'
@@ -296,8 +344,9 @@ class Item(ABC):
             # case if mo[self.match_name] is None: optional item
             if self.optional:
                 return None
-            msg = ("Unoptional item failed to get the corresponding value. ",
-                   "Don't use special characters such as ? in Item.pattern.")
+            msg = ("Unoptional item failed to get the corresponding value. "
+                   "Don't use special characters such as ? in Item.pattern. "
+                   "If using full_format, enclose optional Item with \"()?\" manually.")
             raise _common.ParserDefinitionError(msg)
 
     def pick_value(self, mo):

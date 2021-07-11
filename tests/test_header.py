@@ -23,6 +23,31 @@ class TestHeader(unittest.TestCase):
             ret = hp.process_header(line)
             assert ret is not None
 
+    def test_full_format(self):
+        input_lines = ["Sep  1 01:02:03 host daemon[12345]: test: message ::1",
+                       "Sep 12 11:22:33 host doraemon: restart"]
+
+        from log2seq import header
+        from log2seq import preset
+        from log2seq import LogParser
+        header_rule = [header.MonthAbbreviation(),
+                       header.Digit("day"),
+                       header.Time(),
+                       header.Hostname("host"),
+                       header.String("function"),
+                       header.Digit("pid", optional=True),
+                       header.Statement()]
+        full_format = r"<0> <1> <2> <3> <4>(\[<5>\])?: <6>"
+        defaults = {"year": datetime.datetime.now().year}
+        hp = header.HeaderParser(header_rule, full_format=full_format,
+                                 defaults=defaults)
+        sp = preset.default_statement_parser()
+        parser = LogParser(hp, sp)
+
+        for line in input_lines:
+            ret = parser.process_header(line)
+            assert ret is not None
+
     def test_time(self):
         input_lines = ["2112-09-03 11:22:33.012345 host something failure"]
 
