@@ -14,7 +14,7 @@ log2seq
    :alt: BSD 3-Clause License
    :target: https://opensource.org/licenses/BSD-3-Clause
 
-.. image:: https://travis-ci.com/cpflat/log2seq.svg?branch=master
+.. image:: https://travis-ci.com/amulog/log2seq.svg?branch=master
    :alt: Travis CI
    :target: https://travis-ci.com/github/cpflat/log2seq
 
@@ -28,8 +28,8 @@ that is more suitable for further automated analysis.
 It is based on a procedure customizable with rules in order, using regular expressions.
 
 * Document: https://log2seq.readthedocs.io
-* Source: https://github.com/cpflat/log2seq
-* Bug Reports: https://github.com/cpflat/log2seq/issues
+* Source: https://github.com/amulog/log2seq
+* Bug Reports: https://github.com/amulog/log2seq/issues
 * Author: `Satoru Kobayashi <https://github.com/cpflat/>`_
 * License: `BSD-3-Clause <https://opensource.org/licenses/BSD-3-Clause>`_
 

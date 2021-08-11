@@ -139,11 +139,12 @@ class _ActionBase(ABC):
                 yield part[current:length], label_other
 
     @staticmethod
-    def _separate_partial_match(part, mo, match_groups, label_match, label_other):
+    def _separate_partial_match(part, mo, match_groups, label_other):
         current = 0
         length = len(part)
-        sorted_match_groups = sorted(match_groups, key=lambda x: mo.start(x))
+        sorted_match_groups = sorted(match_groups.keys(), key=lambda x: mo.start(x))
         for match_group in sorted_match_groups:
+            label_match = match_groups[match_group]
             if mo.start(match_group) == -1:
                 continue
             if mo.start(match_group) > current:
@@ -215,6 +216,7 @@ class _PartialActionBase(_ActionBase, ABC):
     _l_regex = None
     _rest_flag = None
     _fix_groups = None
+    _remove_groups = None
 
     def __init__(self, patterns):
         self._init_patterns(patterns)
@@ -274,8 +276,9 @@ class FixPartial(_PartialActionBase):
         Following example with :class:`FixPartial` can fix the comment part.
 
     Example:
-        >>> pattern = r'^.*?"(?P<fix>.+?)".*$'
-        >>> parser = StatementParser([FixPartial(pattern, fix_groups=["fix"], rest_remove=False), Split(' :."')])
+        >>> pattern = r'^.*?(?P<left>")(?P<fix>.+?)(?P<right>").*$'
+        >>> parser = StatementParser([FixPartial(pattern, fix_groups=["fix"], \\
+        ... remove_groups=["left", "right"], rest_remove=False), Split(' :.')])
         >>> parser.process_line('comment added: "This is a comment description".')
         (['comment', 'added', 'This is a comment description'], ['', ' ', ': "', '".'])
 
@@ -288,6 +291,8 @@ class FixPartial(_PartialActionBase):
             Unspecified groups are not fixed,
             so you can use other group names to other re functions
             like back references.
+        remove_groups (str or list of str, optional): Name groups in the patterns
+            that should be considered as separators.
         rest_remove (bool, optional): This option determines
             how to handle strings outside the fixed groups.
             e.g., 'comment added: "' and '".' in Usecase 2.
@@ -297,13 +302,20 @@ class FixPartial(_PartialActionBase):
             and will not be segmented further.
     """
 
-    def __init__(self, patterns, fix_groups, rest_remove=False):
+    def __init__(self, patterns, fix_groups, remove_groups=None, rest_remove=False):
         super().__init__(patterns)
 
         if isinstance(fix_groups, str):
             self._fix_groups = [fix_groups]
         else:
             self._fix_groups = fix_groups
+
+        if remove_groups is None:
+            self._remove_groups = []
+        elif isinstance(remove_groups, str):
+            self._remove_groups = [remove_groups]
+        else:
+            self._remove_groups = remove_groups
 
         if rest_remove:
             self._rest_flag = _FLAG_SEPARATORS
@@ -314,8 +326,14 @@ class FixPartial(_PartialActionBase):
         self._l_regex = self._standard_patterns(patterns)
 
     def _separate_partial(self, part, mo):
-        return self._separate_partial_match(part, mo, self._fix_groups,
-                                            _FLAG_FIXED, self._rest_flag)
+        match_groups = {}
+        match_groups.update({gname: _FLAG_FIXED
+                             for gname in self._fix_groups})
+        match_groups.update({gname: _FLAG_SEPARATORS
+                             for gname in self._remove_groups})
+
+        return self._separate_partial_match(part, mo, match_groups,
+                                            self._rest_flag)
 
 
 class FixParenthesis(_PartialActionBase):
@@ -342,8 +360,11 @@ class FixParenthesis(_PartialActionBase):
     to extract in the action.
     """
     _key_fix = "fix"
-    _rest_flag = _FLAG_UNKNOWN
     _fix_groups = [_key_fix, ]
+    _key_left = "left"
+    _key_right = "right"
+    _remove_groups = [_key_left, _key_right]
+    _rest_flag = _FLAG_UNKNOWN
 
     def _init_patterns(self, patterns):
         if isinstance(patterns, str):
@@ -360,14 +381,20 @@ class FixParenthesis(_PartialActionBase):
         assert len(parent_pattern) == 2, "Invalid pattern for FixParenthesis"
         p_left = parent_pattern[0]
         p_right = parent_pattern[1]
-        restr = r'^.*?' + re.escape(p_left) + \
-                '(?P<' + cls._key_fix + r'>.+?)' + \
-                re.escape(p_right) + r'.*$'
+        restr = r'^.*?' + \
+                r'(?P<' + cls._key_left + '>' + re.escape(p_left) + ')' + \
+                r'(?P<' + cls._key_fix + r'>.+?)' + \
+                r'(?P<' + cls._key_right + '>' + re.escape(p_right) + r')' + \
+                r'.*$'
         return re.compile(restr)
 
     def _separate_partial(self, part, mo):
-        return self._separate_partial_match(part, mo, self._fix_groups,
-                                            _FLAG_FIXED, _FLAG_UNKNOWN)
+        match_groups = {}
+        match_groups.update({gname: _FLAG_FIXED
+                             for gname in self._fix_groups})
+        match_groups.update({gname: _FLAG_SEPARATORS
+                             for gname in self._remove_groups})
+        return self._separate_partial_match(part, mo, match_groups, _FLAG_UNKNOWN)
 
 
 class FixIP(_ActionBase):
@@ -494,16 +521,18 @@ class RemovePartial(_PartialActionBase):
         super().__init__(patterns)
 
         if isinstance(remove_groups, str):
-            self._match_groups = [remove_groups]
+            self._remove_groups = [remove_groups]
         else:
-            self._match_groups = remove_groups
+            self._remove_groups = remove_groups
 
     def _init_patterns(self, patterns):
         self._l_regex = self._standard_patterns(patterns)
 
     def _separate_partial(self, part, mo):
-        return self._separate_partial_match(part, mo, self._match_groups,
-                                            _FLAG_SEPARATORS, _FLAG_UNKNOWN)
+        match_groups = {}
+        match_groups.update({gname: _FLAG_SEPARATORS
+                             for gname in self._remove_groups})
+        return self._separate_partial_match(part, mo, match_groups, _FLAG_UNKNOWN)
 
 
 class Split(_ActionBase):

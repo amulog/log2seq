@@ -62,14 +62,15 @@ class TestStatement(unittest.TestCase):
         assert l_w == ["source", "192.0.2.1", "80", "initialized"]
 
     def test_fix_parenthesis(self):
-        input_mes = 'comment added: "This is a comment description".'
+        input_mes = 'comment added: "This is a comment description" "This is second desc".'
         statement_rules = [
+            FixParenthesis(['"', '"']),
             FixParenthesis(['"', '"']),
             Split(' .:"')
         ]
         sp = StatementParser(statement_rules)
         l_w, l_s = sp.process_line(input_mes)
-        assert l_w == ["comment", "added", "This is a comment description"]
+        assert l_w == ["comment", "added", "This is a comment description", "This is second desc"]
 
     def test_remove_partial(self):
         input_mes = "2000 Mar 4 12:34:56.789: host: :: and 127.0.0.1 duplicated timestamp given."
