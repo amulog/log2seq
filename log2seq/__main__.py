@@ -54,7 +54,8 @@ def main(files, parser, output, format_type, as_statement, verbose):
                     continue
 
                 if as_statement:
-                    words, seps = lp.process_statement(line, verbose=verbose)
+                    words, seps = lp.process_statement(line.rstrip(),
+                                                       verbose=verbose)
                     buf = format_parsed_statement(words, seps, format_type)
                 else:
                     pline = lp.process_line(line, verbose=verbose)
