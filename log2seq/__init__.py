@@ -9,4 +9,4 @@ from ._common import KEY_STATEMENT
 from ._common import KEY_WORDS
 from ._common import KEY_SYMBOLS
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'

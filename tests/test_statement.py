@@ -1,5 +1,3 @@
-# coding: utf-8
-
 import unittest
 
 from log2seq.statement import *
@@ -66,6 +64,14 @@ class TestStatement(unittest.TestCase):
         statement_rules = [
             FixParenthesis(['"', '"']),
             FixParenthesis(['"', '"']),
+            Split(' .:"')
+        ]
+        sp = StatementParser(statement_rules)
+        l_w, l_s = sp.process_line(input_mes)
+        assert l_w == ["comment", "added", "This is a comment description", "This is second desc"]
+
+        statement_rules = [
+            FixParenthesis(['"', '"'], recursive=True),
             Split(' .:"')
         ]
         sp = StatementParser(statement_rules)

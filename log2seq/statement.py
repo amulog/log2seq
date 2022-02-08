@@ -92,7 +92,7 @@ class StatementParser:
             Second component, symbols, is list of separator string symbols.
             The length of symbols is always len(words)+1, which includes
             one before first word and one after last word.
-            Some of the symbols can be empty string.
+            Some symbols can be empty string.
         """
         if verbose:
             print("Statement: {0}".format(statement))
@@ -140,6 +140,10 @@ class _ActionBase(ABC):
 
     @staticmethod
     def _separate_partial_match(part, mo, match_groups, label_other):
+        """Considering the given Match Object (mo),
+        this function separates the given string (part)
+        into three string (the second string is the matching part).
+        Yields the separated string and its label (match_group name or label_other)."""
         current = 0
         length = len(part)
         sorted_match_groups = sorted(match_groups.keys(), key=lambda x: mo.start(x))
@@ -147,6 +151,8 @@ class _ActionBase(ABC):
             label_match = match_groups[match_group]
             if mo.start(match_group) == -1:
                 continue
+            if mo.start(match_group) < current:
+                raise ValueError("Invalid pattern with duplicated name groups")
             if mo.start(match_group) > current:
                 yield part[current:mo.start(match_group)], label_other
             yield part[mo.start(match_group):mo.end(match_group)], label_match
@@ -214,36 +220,93 @@ class _PartialActionBase(_ActionBase, ABC):
 
     # private attributes for child classes
     _l_regex = None
-    _rest_flag = None
-    _fix_groups = None
-    _remove_groups = None
+    # _rest_flag = None
+    _flag_other = None
+    _match_groups = None
+    # _fix_groups = None
+    # _remove_groups = None
 
-    def __init__(self, patterns):
-        self._init_patterns(patterns)
+    def __init__(self, patterns, recursive=False):
+        self._l_regex = self._init_patterns(patterns)
+        self._match_groups = self._init_match_groups()
+        self._recursive = recursive
 
     @abstractmethod
     def _init_patterns(self, patterns):
         raise NotImplementedError
 
     @abstractmethod
-    def _separate_partial(self, part, mo):
+    def _init_match_groups(self):
         raise NotImplementedError
 
-    def do(self, iterable_parts):
-        for s, flag in iterable_parts:
-            if self._is_active_part(s, flag):
-                for reobj in self._l_regex:
-                    mo = reobj.match(s)
-                    if mo:
-                        # match -> separate matched part and others
-                        for p in self._separate_partial(s, mo):
-                            yield p
-                        # other patterns are ignored for this part
-                        break
-                else:
-                    yield s, flag
+    def _separate_partial(self, part, flag, reobj):
+        if self._recursive:
+            return self._separate_partial_recursive(part, flag, reobj)
+        else:
+            mo = reobj.match(part)
+            if mo:
+                return self._separate_partial_match(
+                    part, mo, self._match_groups, self._flag_other
+                )
             else:
-                yield s, flag
+                return [(part, flag), ]
+
+    def _separate_partial_recursive(self, part, flag, reobj):
+        mo = reobj.match(part)
+        if mo:
+            # match -> separate matched part and others
+            iterobj = self._separate_partial_match(
+                part, mo, self._match_groups, self._flag_other
+            )
+            for tmp_part, tmp_flag in iterobj:
+                if tmp_flag == self._flag_other:
+                    iterobj = self._separate_partial_recursive(
+                        tmp_part, tmp_flag, reobj
+                    )
+                    for p in iterobj:
+                        yield p
+                else:
+                    yield tmp_part, tmp_flag
+        else:
+            yield part, flag
+
+    @staticmethod
+    def _separate_partial_match(part, mo, match_groups, label_other):
+        """Considering the given Match Object (mo),
+        this function separates the given string (part)
+        into three string (the second string is the matching part).
+        Yields the separated string and its label (match_group name or label_other)."""
+        current = 0
+        length = len(part)
+        sorted_match_groups = sorted(match_groups.keys(), key=lambda x: mo.start(x))
+        for match_group in sorted_match_groups:
+            label_match = match_groups[match_group]
+            if mo.start(match_group) == -1:
+                continue
+            if mo.start(match_group) < current:
+                raise ValueError("Invalid pattern with duplicated name groups")
+            if mo.start(match_group) > current:
+                yield part[current:mo.start(match_group)], label_other
+            yield part[mo.start(match_group):mo.end(match_group)], label_match
+            current = mo.end(match_group)
+        else:
+            if current < length:
+                yield part[current:length], label_other
+
+    def do(self, iterable_parts):
+        parts = iterable_parts
+        for reobj in self._l_regex:
+            new_parts = []
+            for s, flag in parts:
+                if self._is_active_part(s, flag):
+                    for p in self._separate_partial(s, flag, reobj):
+                        new_parts.append(p)
+                else:
+                    new_parts.append((s, flag))
+            parts = new_parts
+
+        for p in parts:
+            yield p
 
 
 class FixPartial(_PartialActionBase):
@@ -272,7 +335,7 @@ class FixPartial(_PartialActionBase):
 
         If you intend to consider the comment (strings between parenthesis)
         as a word without segmentation,
-        this cannot be achieved with with simple Fix and Split actions.
+        this cannot be achieved with simple Fix and Split actions.
         Following example with :class:`FixPartial` can fix the comment part.
 
     Example:
@@ -291,6 +354,7 @@ class FixPartial(_PartialActionBase):
             Unspecified groups are not fixed,
             so you can use other group names to other re functions
             like back references.
+        recursive (bool, optional): If True, the patterns will be searched recursively.
         remove_groups (str or list of str, optional): Name groups in the patterns
             that should be considered as separators.
         rest_remove (bool, optional): This option determines
@@ -298,13 +362,12 @@ class FixPartial(_PartialActionBase):
             e.g., 'comment added: "' and '".' in Usecase 2.
             Defaults to False, which means they are left as parts
             for further actions.
-            In contrast if True, they are considered eparators
-            and will not be segmented further.
+            In contrast, if True, they are considered as separators
+            and will not be segmented or fixed further.
     """
 
-    def __init__(self, patterns, fix_groups, remove_groups=None, rest_remove=False):
-        super().__init__(patterns)
-
+    def __init__(self, patterns, fix_groups,
+                 recursive=False, remove_groups=None, rest_remove=False):
         if isinstance(fix_groups, str):
             self._fix_groups = [fix_groups]
         else:
@@ -318,22 +381,22 @@ class FixPartial(_PartialActionBase):
             self._remove_groups = remove_groups
 
         if rest_remove:
-            self._rest_flag = _FLAG_SEPARATORS
+            self._flag_other = _FLAG_SEPARATORS
         else:
-            self._rest_flag = _FLAG_UNKNOWN
+            self._flag_other = _FLAG_UNKNOWN
+
+        super().__init__(patterns, recursive=recursive)
 
     def _init_patterns(self, patterns):
-        self._l_regex = self._standard_patterns(patterns)
+        return self._standard_patterns(patterns)
 
-    def _separate_partial(self, part, mo):
+    def _init_match_groups(self):
         match_groups = {}
         match_groups.update({gname: _FLAG_FIXED
                              for gname in self._fix_groups})
         match_groups.update({gname: _FLAG_SEPARATORS
                              for gname in self._remove_groups})
-
-        return self._separate_partial_match(part, mo, match_groups,
-                                            self._rest_flag)
+        return match_groups
 
 
 class FixParenthesis(_PartialActionBase):
@@ -364,16 +427,16 @@ class FixParenthesis(_PartialActionBase):
     _key_left = "left"
     _key_right = "right"
     _remove_groups = [_key_left, _key_right]
-    _rest_flag = _FLAG_UNKNOWN
+    _flag_other = _FLAG_UNKNOWN
 
     def _init_patterns(self, patterns):
         if isinstance(patterns, str):
-            self._l_regex = [self._init_named_pattern(patterns)]
+            return [self._init_named_pattern(patterns)]
         elif len(patterns) == 2 and isinstance(patterns[0], str):
-            self._l_regex = [self._init_named_pattern(patterns)]
+            return [self._init_named_pattern(patterns)]
         else:
-            self._l_regex = [self._init_named_pattern(pattern)
-                             for pattern in patterns]
+            return [self._init_named_pattern(pattern)
+                    for pattern in patterns]
 
     @classmethod
     def _init_named_pattern(cls, parent_pattern):
@@ -388,17 +451,17 @@ class FixParenthesis(_PartialActionBase):
                 r'.*$'
         return re.compile(restr)
 
-    def _separate_partial(self, part, mo):
+    def _init_match_groups(self):
         match_groups = {}
         match_groups.update({gname: _FLAG_FIXED
                              for gname in self._fix_groups})
         match_groups.update({gname: _FLAG_SEPARATORS
                              for gname in self._remove_groups})
-        return self._separate_partial_match(part, mo, match_groups, _FLAG_UNKNOWN)
+        return match_groups
 
 
 class FixIP(_ActionBase):
-    """Add Fixed flag to parts of IP addresses.
+    """Add Fixed flag to the parts of IP addresses.
 
     This class use ipaddress library instead of regular expression.
 
@@ -517,22 +580,24 @@ class RemovePartial(_PartialActionBase):
         (['2000', 'Mar', '4', '12:34:56.789', 'duplicated', 'header'], ['', ' ', ' ', ' ', ': ', ' ', ''])
     """
 
-    def __init__(self, patterns, remove_groups):
-        super().__init__(patterns)
+    _flag_other = _FLAG_UNKNOWN
 
+    def __init__(self, patterns, remove_groups, recursive=False):
         if isinstance(remove_groups, str):
             self._remove_groups = [remove_groups]
         else:
             self._remove_groups = remove_groups
 
-    def _init_patterns(self, patterns):
-        self._l_regex = self._standard_patterns(patterns)
+        super().__init__(patterns, recursive=recursive)
 
-    def _separate_partial(self, part, mo):
+    def _init_patterns(self, patterns):
+        return self._standard_patterns(patterns)
+
+    def _init_match_groups(self):
         match_groups = {}
         match_groups.update({gname: _FLAG_SEPARATORS
                              for gname in self._remove_groups})
-        return self._separate_partial_match(part, mo, match_groups, _FLAG_UNKNOWN)
+        return match_groups
 
 
 class Split(_ActionBase):
@@ -552,7 +617,7 @@ class Split(_ActionBase):
 
     Args:
         separators (str): separator symbol strings.
-            If iterable, they are imply joined and used all for segmentation.
+            If iterable, they imply joined and used all for segmentation.
             Escape sequence is internally added, so you don't need
             to add it manually.
     """

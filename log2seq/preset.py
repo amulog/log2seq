@@ -4,10 +4,11 @@
 for frequently used log formats."""
 
 
+from ._common import LogParser
 from .header import *
 from .statement import *
-from ._common import LogParser
 
+PARSER_OBJECT_NAME = "parser"
 
 pattern_time = r"^\d{2}:\d{2}:\d{2}(\.\d+)?$"
 pattern_macaddr = r"^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"
@@ -87,3 +88,21 @@ def default():
     """
     return LogParser(default_header_parsers(),
                      default_statement_parser())
+
+
+def load_parser_script(script_filepath):
+    import sys
+    import os.path
+    from importlib import import_module
+
+    # add script to sys.path
+    path = os.path.dirname(script_filepath)
+    sys.path.append(os.path.abspath(path))
+
+    # import dynamically
+    libname = os.path.splitext(os.path.basename(script_filepath))[0]
+    script_mod = import_module(libname)
+
+    # obtain parser object
+    lp = getattr(script_mod, PARSER_OBJECT_NAME)
+    return lp
