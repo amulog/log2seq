@@ -5,6 +5,17 @@ import sys
 import click
 
 
+def iter_lines(files):
+    if len(files) == 0:
+        for line in sys.stdin.readlines():
+            yield line.rstrip()
+    else:
+        for file in files:
+            with open(file, "r") as f:
+                for line in f.readlines():
+                    yield line.rstrip()
+
+
 def format_parsed_line(pline, format_type):
     if format_type == "object":
         return str(pline)
@@ -32,6 +43,7 @@ def format_parsed_statement(words, separators, format_type):
 @click.option("--verbose", "-v", is_flag=True,
               help="verbose output to stderr")
 def main(files, parser, output, format_type, as_statement, verbose):
+    """Parse log messages given in FILES (or stdin if FILES not given)."""
 
     if format_type not in ("object", "words"):
         click.BadParameter("invalid type")
@@ -47,21 +59,17 @@ def main(files, parser, output, format_type, as_statement, verbose):
     else:
         f_output = sys.stdout
 
-    for file in files:
-        with open(file, "r") as f:
-            for line in f:
-                if line.rstrip() == "":
-                    continue
+    for line in iter_lines(files):
+        if line != "":
+            if as_statement:
+                words, seps = lp.process_statement(line,
+                                                   verbose=verbose)
+                buf = format_parsed_statement(words, seps, format_type)
+            else:
+                pline = lp.process_line(line, verbose=verbose)
+                buf = format_parsed_line(pline, format_type)
 
-                if as_statement:
-                    words, seps = lp.process_statement(line.rstrip(),
-                                                       verbose=verbose)
-                    buf = format_parsed_statement(words, seps, format_type)
-                else:
-                    pline = lp.process_line(line, verbose=verbose)
-                    buf = format_parsed_line(pline, format_type)
-
-                f_output.write(buf)
+            f_output.write(buf + "\n")
 
     f_output.close()
 

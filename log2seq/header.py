@@ -13,6 +13,14 @@ _KEY_STATEMENT = _common.KEY_STATEMENT
 # keys for internal processing
 _KEY_DATE = "date"
 _KEY_TIME = "time"
+_KEY_YEAR = "year"
+_KEY_MONTH = "month"
+_KEY_DAY = "day"
+_KEY_HOUR = "hour"
+_KEY_MINUTE = "minute"
+_KEY_SECOND = "second"
+_KEY_SECOND_DECIMAL = "dsecond"  # decimal part of seconds
+_KEY_TZ = "tz"
 
 
 class _HeaderParserBase(ABC):
@@ -409,23 +417,23 @@ class DatetimeISOFormat(Item):
 
     @property
     def pattern(self):
-        return (r'(\d{4})-(\d{2})-(\d{2})T'  # year-month-dayT
-                r'(\d{2}):(\d{2}):(\d{2})'  # hour:minute:second
-                r'(\.\d{6})?'  # microseconds
-                r'([+-](\d{2})\:(\d{2}))?')  # timezone
+        return (r'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})T'  # year-month-dayT
+                r'(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})'  # hour:minute:second
+                r'(\.(?P<dsecond>\d+))?'  # decimal part of seconds
+                r'(?P<tz>Z|([+-](\d{2})\:(\d{2})))?')  # timezone
 
     def pick_value(self, mo):
         """Returns :obj:`datetime.datetime`."""
         # dateutil too slow!
         # return dateutil.parser.parse(mo[self.match_name])
 
-        return self.parse_datetimestr(mo[self.match_name])
+        return self.parse_datetimestr(mo)
 
     @staticmethod
-    def parse_datetimestr(string):
-        datestr, _, timestr = string.partition("T")
-        date = Date.parse_datestr(datestr)
-        time = Time.parse_timestr(timestr)
+    def parse_datetimestr(mo):
+        # datestr, _, timestr = string.partition("T")
+        date = Date.parse_datestr(mo)
+        time = Time.parse_timestr(mo)
         return datetime.datetime.combine(date, time)
 
 
@@ -441,7 +449,7 @@ class Date(Item):
 
     @property
     def pattern(self):
-        return r'(\d{4})-(\d{2})-(\d{2})'  # year-month-day
+        return r'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})'  # year-month-day
 
     def pick_value(self, mo):
         """Returns :obj:`datetime.date`."""
@@ -449,13 +457,13 @@ class Date(Item):
         # dt = dateutil.parser.parse(mo[self.match_name])
         # return dt.date()
 
-        return self.parse_datestr(mo[self.match_name])
+        return self.parse_datestr(mo)
 
     @staticmethod
-    def parse_datestr(string):
-        d = {"year": int(string[0:4]),
-             "month": int(string[5:7]),
-             "day": int(string[8:10])}
+    def parse_datestr(mo):
+        d = {"year": int(mo.group(_KEY_YEAR)),
+             "month": int(mo.group(_KEY_MONTH)),
+             "day": int(mo.group(_KEY_DAY))}
         return datetime.date(**d)
 
 
@@ -470,9 +478,9 @@ class Time(Item):
 
     @property
     def pattern(self):
-        return (r'(\d{2}):(\d{2}):(\d{2})'  # hour:minute:second
-                r'(\.\d{6})?'  # microseconds
-                r'([+-](\d{2})\:(\d{2}))?')  # timezone
+        return (r'(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})'  # hour:minute:second
+                r'(\.(?P<dsecond>\d+))?'  # decimal part of seconds
+                r'(?P<tz>Z|([+-](\d{2})\:(\d{2})))?')  # timezone
 
     def pick_value(self, mo):
         """Returns `datetime.time <https://docs.python.org/ja/3/library/datetime.html>`_."""
@@ -481,23 +489,28 @@ class Time(Item):
         # return dt.time()
 
         # manual parse
-        return self.parse_timestr(mo[self.match_name])
+        return self.parse_timestr(mo)
 
     @staticmethod
-    def parse_timestr(string):
-        d = {"hour": int(string[0:2]),
-             "minute": int(string[3:5]),
-             "second": int(string[6:8])}
-        opt = string[8:]
-        if '.' in string:
-            d["microsecond"] = int(opt[1:7])
-            opt = opt[7:]
-        if len(opt) > 0:
-            d["tzinfo"] = Time.parse_tz(opt)
+    def parse_timestr(mo):
+        d = {"hour": int(mo.group(_KEY_HOUR)),
+             "minute": int(mo.group(_KEY_MINUTE)),
+             "second": int(mo.group(_KEY_SECOND))}
+        if mo.group(_KEY_SECOND_DECIMAL) is not None:
+            size = len(mo.group(_KEY_SECOND_DECIMAL))
+            decimal = int(mo.group(_KEY_SECOND_DECIMAL))
+            microsec = decimal / (10 ** size) * 10 ** 6
+            d["microsecond"] = int(microsec)
+        if mo.group(_KEY_TZ) is not None:
+            d["tzinfo"] = Time.parse_tz(mo.group(_KEY_TZ))
+
         return datetime.time(**d)
 
     @staticmethod
     def parse_tz(string):
+        if string == "Z":
+            return datetime.timezone.utc
+
         # referring official _strptime.py (v3.7.2)
         z = string.lower()
         if z[3] == ':':
@@ -516,8 +529,8 @@ class Time(Item):
         if z.startswith("-"):
             gmtoff = -gmtoff
             gmtoff_fraction = -gmtoff_fraction
-        tzdelta = datetime.timedelta(seconds = gmtoff,
-                                     microseconds = gmtoff_fraction)
+        tzdelta = datetime.timedelta(seconds=gmtoff,
+                                     microseconds=gmtoff_fraction)
         return datetime.timezone(tzdelta)
 
 
