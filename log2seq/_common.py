@@ -8,6 +8,8 @@ KEY_STATEMENT = "message"
 KEY_WORDS = 'words'
 KEY_SYMBOLS = 'symbols'
 
+PARSER_OBJECT_NAME = "parser"
+
 
 class ParserDefinitionError(Exception):
     """ParserDefinitionError is raised when the given rules
@@ -35,13 +37,14 @@ class LogParser:
     Parsed results are returned in one dict object.
     It consists of following parsed information.
 
-    * Header informations (:attr:`~header.Item.value_name` as key)
+    * Header information (:attr:`~header.Item.value_name` as key)
     * Statement part in string format ("message" as key)
     * Segmented words in statement part ("words" as key)
     * Separator symbols in ststement part ("symbols" as key)
 
     Example:
         >>> mes = "Jan  1 12:34:56 host-device1 system[12345]: host 2001:0db8:1234::1 (interface:eth0) disconnected"
+        >>> import log2seq
         >>> parser = log2seq.init_parser()  # get default LogParser
         >>> parsed_line = parser.process_line(mes)
         >>> parsed_line["timestamp"]  # timestamp parsed by HeaderParser
@@ -171,3 +174,21 @@ def init_parser(header_parsers=None, statement_parser=None):
         from . import preset
         statement_parser = preset.default_statement_parser()
     return LogParser(header_parsers, statement_parser)
+
+
+def load_parser_script(script_filepath):
+    import sys
+    import os.path
+    from importlib import import_module
+
+    # add script to sys.path
+    path = os.path.dirname(script_filepath)
+    sys.path.append(os.path.abspath(path))
+
+    # import dynamically
+    libname = os.path.splitext(os.path.basename(script_filepath))[0]
+    script_mod = import_module(libname)
+
+    # obtain parser object
+    lp = getattr(script_mod, PARSER_OBJECT_NAME)
+    return lp

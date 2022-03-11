@@ -569,7 +569,7 @@ class RemovePartial(_PartialActionBase):
 
     Usual :class:`Remove` consider the matched part as a separator.
     In contrast, :class:`RemovePartial` allow
-    partially removing separators from a word.
+    partially removing separators from a word matching with the given patterns.
 
     Example:
         >>> rpattern = r'^.*([^:](?P<colon>:))$'
@@ -642,17 +642,6 @@ class Split(_ActionBase):
                 yield s[current:length], _FLAG_UNKNOWN
 
     def do(self, iterable_parts):
-        """Apply this action to all input parts.
-        This function works as like a filter of the statement.
-        This method function is used by StatementParser.
-
-        Args:
-            iterable_parts (iterator of tuple): Sequence of tuples,
-                including segmented statement and its annotation label.
-
-        Yields:
-            tuple: same format as the input arguments.
-        """
         for s, flag in iterable_parts:
             if self._is_active_part(s, flag):
                 matchobjs = self._regex.finditer(s)
@@ -663,6 +652,26 @@ class Split(_ActionBase):
 
 
 class ConditionalSplit(Fix, Split):
+    """Split parts matching the given patterns by given separators.
+
+    Example:
+        >>> parser = StatementParser([
+        >>>     Split(" ()"),
+        >>>     RemovePartial(r'^.*[^:](?P<colon>:)$', remove_groups=["colon"]),
+        >>>     ConditionalSplit(r'^%[A-Z]+-\\d+(-[A-Z]+-\\d+)?$', r'%-')
+        >>> ])
+        >>> parser.process_line("%KERNEL-4-EVENT-7: host h1-i2.example.org scored -0.035 value (20.0%)")
+        ['KERNEL', '4', 'EVENT', '7', 'host', 'h1-i2.example.org', 'scored', '-0.035', 'value', '20.0%']
+
+    Args:
+        patterns (str): Regular expression patterns.
+            If multiple patterns given, this action will split
+            parts matching at least one of them.
+        separators (str): separator symbol strings.
+            If iterable, they imply joined and used all for segmentation.
+            Escape sequence is internally added, so you don't need
+            to add it manually.
+    """
 
     def __init__(self, patterns, separators):
         Fix.__init__(self, patterns)

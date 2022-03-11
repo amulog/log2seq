@@ -48,7 +48,8 @@ def main(files, parser, output, format_type, as_statement, verbose):
     if format_type not in ("object", "words"):
         click.BadParameter("invalid type")
 
-    from .preset import default, load_parser_script
+    from .preset import default
+    from log2seq._common import load_parser_script
     if parser:
         lp = load_parser_script(parser)
     else:

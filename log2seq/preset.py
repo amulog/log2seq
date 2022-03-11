@@ -8,8 +8,6 @@ from ._common import LogParser
 from .header import *
 from .statement import *
 
-PARSER_OBJECT_NAME = "parser"
-
 pattern_time = r"^\d{2}:\d{2}:\d{2}(\.\d+)?$"
 pattern_macaddr = r"^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"
 
@@ -77,7 +75,7 @@ def default_statement_parser():
 
 
 def default():
-    """Generates :class:`~log2seq.LogParser` of default settings.
+    """Generate :class:`~log2seq.LogParser` of default settings.
 
     It consists of :func:`default_header_parsers`
     and :func:`default_statement_parser`.
@@ -91,56 +89,60 @@ def default():
 
 
 def apache_errorlog_parser():
+    """Generate :class:`~log2seq.LogParser` for Apache error logs in default format.
+
+    | e.g.,
+        ``[Wed Oct 11 14:32:52 2000] [error] [client 127.0.0.1]
+        client denied by server configuration: /export/home/live/ap/htdocs/test``
+
+    | e.g.,
+        ``[Fri Sep 09 10:42:29.902022 2011] [core:error] [pid 35708:tid 4328636416] [client 72.15.99.187]
+        File does not exist: /usr/local/apache2/htdocs/favicon.ico``
+
+    Returns:
+        :class:`~log2seq.LogParser`
+
+    Reference:
+        Log Files - Apache HTTP Server Version 2.4: https://httpd.apache.org/docs/2.4/en/logs.html
+    """
     header_rule1 = [
-        String("weekday", dummy=True),
-        MonthAbbreviation(),
-        Digit("day"),
-        Time(),
-        Digit("year"),
+        ItemGroup([String("weekday", dummy=True),
+                   MonthAbbreviation(),
+                   Digit("day"),
+                   Time(),
+                   Digit("year")],
+                  separator=" "),
         String("severityname"),
-        UserItem("client", r"client", optional=True, dummy=True),
-        Hostname("host", optional=True),
+        ItemGroup([UserItem("client", r"client", optional=True, dummy=True),
+                   Hostname("host", optional=True)],
+                  separator=None),
         Statement()
     ]
     separator1 = " []"
     p1 = HeaderParser(header_rule1, separator=separator1)
 
     header_rule2 = [
-        String("weekday", dummy=True),
-        MonthAbbreviation(),
-        Digit("day"),
-        Time(),
-        Digit("year"),
-        UserItem("core", r"core", dummy=True),
-        String("severityname"),
-        UserItem("pid", r"pid", dummy=True),
-        Digit("processid"),
-        UserItem("tid", r"tid", dummy=True),
-        Digit("threadid"),
-        UserItem("client", r"client", optional=True, dummy=True),
-        Hostname("host", optional=True),
+        ItemGroup([String("weekday", dummy=True),
+                   MonthAbbreviation(),
+                   Digit("day"),
+                   Time(),
+                   Digit("year")],
+                  separator=" "),
+        ItemGroup([UserItem("core", r"core", dummy=True),
+                   String("severityname")],
+                  separator=":"),
+        ItemGroup([UserItem("pid", r"pid", dummy=True),
+                   Digit("processid"),
+                   UserItem("tid", r"tid", dummy=True),
+                   Digit("threadid")],
+                  separator=": "),
+        ItemGroup([UserItem("client", r"client", dummy=True),
+                   Hostname("host")],
+                  separator=None, optional=True),
         Statement()
     ]
-    separator2 = " []:"
+    separator2 = " []"
     p2 = HeaderParser(header_rule2, separator=separator2)
 
     return LogParser([p1, p2],
                      default_statement_parser())
-
-
-def load_parser_script(script_filepath):
-    import sys
-    import os.path
-    from importlib import import_module
-
-    # add script to sys.path
-    path = os.path.dirname(script_filepath)
-    sys.path.append(os.path.abspath(path))
-
-    # import dynamically
-    libname = os.path.splitext(os.path.basename(script_filepath))[0]
-    script_mod = import_module(libname)
-
-    # obtain parser object
-    lp = getattr(script_mod, PARSER_OBJECT_NAME)
-    return lp

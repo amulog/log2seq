@@ -91,14 +91,15 @@ class HeaderParser(_HeaderParserBase):
     A HeaderParser rule is represented with a list of :class:`Item`.
     Item is a component of regular expression patterns
     to parse corresponding variable item.
-    HeaderParser automatically generate one regular expression pattern
-    from the items, and tests that it matchs with input log messages.
+    HeaderParser automatically generates one regular expression pattern
+    from the items, and tests that it matches the input log messages.
     If matched, HeaderParser extracts variables for the items.
 
     In HeaderParser rule, one :class:`Statement` item is mandatory.
-    Also, if you want to extract timestamp in datetime.datetime format
+
+    If you want to extract timestamp in datetime.datetime format
     (i.e., using reformat_timestamp option),
-    the items should includes ones with special value names (see :attr:`~Item.value_name`):
+    the items should include ones with special value names (see :attr:`~Item.value_name`):
 
     * year (int)
     * month (int)
@@ -115,7 +116,7 @@ class HeaderParser(_HeaderParserBase):
     * date (datetime.date): year, month, day
     * time (datetime.time): hour, minute, second, microsecond, tzinfo
 
-    If some Items are not used, please add the values
+    If some timestamp-related items are not given, please add corresponding values
     (in the specified type) in defaults.
     Note that "year" is missing in some logging framework
     (e.g., default syslogd configuration).
@@ -127,7 +128,8 @@ class HeaderParser(_HeaderParserBase):
     which is similar to log_format in logparser[1].
     It is a regular expression holed with Item replacers.
     For example, if full_format is r"<0> <1> <2> \\[<3>\\] <4>",
-    <0> will be replaced with the first :class:`Item` in items.
+    <0> will be replaced with the first :class:`Item` in items
+    (The number corrsponds to the index of given items).
     If you need "<" and ">", escape it with a backslash.
     The number of replacers must be equal to the length of items.
     Note that optional Items must be manually enclosed with "(" and ")?"
@@ -159,17 +161,31 @@ class HeaderParser(_HeaderParserBase):
         super().__init__(**kwargs)
         self._l_item = items
 
+        self._items_to_pick = self._get_items_to_pick(items)
         self._statement_check(items)
-        self._duplication_check(items)
+        self._duplication_check(self._items_to_pick)
 
         if full_format:
-            self._reobj = self._make_regex_full_format(items, full_format)
+            restr = self.make_pattern_full_format(items, full_format)
         else:
-            self._reobj = self._make_regex_separator(items, separator)
+            restr = self.make_pattern_separator(items, separator)
+        self._reobj = re.compile(restr)
 
     @property
     def pattern(self):
         return self._reobj
+
+    @classmethod
+    def _get_items_to_pick(cls, items):
+        items_to_pick = []
+        for item in items:
+            if isinstance(item, ItemGroup):
+                items_to_pick += cls._get_items_to_pick(item.members())
+            elif item.dummy:
+                pass
+            else:
+                items_to_pick.append(item)
+        return items_to_pick
 
     @staticmethod
     def _statement_check(items):
@@ -179,15 +195,19 @@ class HeaderParser(_HeaderParserBase):
             raise _common.ParserDefinitionError(msg)
 
     @staticmethod
-    def _duplication_check(items):
-        names = [item.match_name for item in items
-                 if not item.dummy]
+    def _duplication_check(items_to_pick):
+        names = [item.match_name for item in items_to_pick]
         if len(names) > len(set(names)):
+            print(items_to_pick)
             msg = "Given items include duplicated match names"
             raise _common.ParserDefinitionError(msg)
 
+    @classmethod
+    def make_pattern_separator(cls, items, separator):
+        return '^' + cls.make_regex_separator(items, separator) + '$'
+
     @staticmethod
-    def _make_regex_separator(items, separator):
+    def make_regex_separator(items, separator):
         if separator is None:
             sep = r'\s+'
         else:
@@ -205,11 +225,10 @@ class HeaderParser(_HeaderParserBase):
                 # the separator is included in the optional part)
                 restr = item.get_regex(separator=sep)
             l_item_regex.append(restr)
-        restr = '^' + "".join(l_item_regex) + '$'
-        return re.compile(restr)
+        return "".join(l_item_regex)
 
     @staticmethod
-    def _make_regex_full_format(items, full_format):
+    def make_pattern_full_format(items, full_format):
         tmp_format = re.sub(" +", r"\\s+", full_format)
         for i, item in reversed(list(enumerate(items))):
             replacer = "<" + str(i) + ">"
@@ -219,8 +238,7 @@ class HeaderParser(_HeaderParserBase):
                 raise _common.ParserDefinitionError(msg)
             tmp_format = tmp_format.replace(replacer, item_regex, 1)
 
-        restr = '^' + tmp_format + '$'
-        return re.compile(restr)
+        return '^' + tmp_format + '$'
 
     def process_line(self, line):
         """Parse header part of a log message (i.e., a line).
@@ -231,20 +249,20 @@ class HeaderParser(_HeaderParserBase):
         Returns:
             dict: Parsed items.
         """
-        items = copy.copy(self._defaults)
+        d_items = copy.copy(self._defaults)
         mo = self._reobj.match(line)
         if mo is None:
             return None
         else:
-            for item in self._l_item:
+            for item in self._items_to_pick:
                 if not item.dummy:
                     tmp = item.pick(mo)
                     if tmp is not None:
                         key, val = tmp
-                        items[key] = val
+                        d_items[key] = val
             if self._reformat:
-                items = self._reformat_timestamp(items)
-            return items
+                d_items = self._reformat_timestamp(d_items)
+            return d_items
 
 
 # class FormattedHeaderParser(HeaderParser):
@@ -275,18 +293,15 @@ class Item(ABC):
     @property
     @abstractmethod
     def pattern(self):
-        """str: Get regular expression pattern for this *Item class*
-        in string format."""
+        """str: Get regular expression pattern string for this *Item class*."""
         raise NotImplementedError
 
     @property
     def optional(self):
-        """bool: This Item instance is optional or not."""
         return self._optional
 
     @property
     def dummy(self):
-        """bool: This Item instance is dummy or not."""
         return self._dummy
 
     @property
@@ -310,9 +325,8 @@ class Item(ABC):
         return self._value_name
 
     def get_regex(self, separator=None):
-        """Get regular expression pattern of this :class:`Item` instance
-        in string format.
-        The pattern is modified considering the options
+        """Get regular expression pattern string of this :class:`Item` instance.
+        The pattern string is modified considering the options
         for :class:`HeaderParser` and this :class:`Item`.
 
         Args:
@@ -376,9 +390,28 @@ class Item(ABC):
             raise IndexError("no match_name {0}".format(self.match_name))
 
 
+class ItemGroup(Item):
+    """ItemGroup enables us a hierarchical parsing of Items.
+    One typical use is defining an optional part including multiple Items appearing together.
+    Another use is using different separator definition in the ItemGroup part.
+    """
+
+    def __init__(self, items, separator=None, optional=False):
+        super().__init__(optional=optional, dummy=True)
+        self._items = items
+        self._pattern = HeaderParser.make_regex_separator(items, separator)
+
+    @property
+    def pattern(self):
+        return self._pattern
+
+    def members(self):
+        return self._items
+
+
 class Statement(Item):
     """Item for statement part.
-    Usually it includes all strings except header part with greedy match.
+    Usually it includes strings except all other items with greedy match.
     """
     _match_name = _KEY_STATEMENT
     _value_name = _KEY_STATEMENT
@@ -639,7 +672,9 @@ class UserItem(NamedItem):
 
     The pattern is described in Python Regular Expression Syntax
     (`re <https://docs.python.org/ja/3/library/re.html>`_).
-    Some special characters are not allowed to use for this Item.
+    Some special characters are not allowed to use for this Item
+    because HeaderParser generates a single re.Pattern
+    by automatically combining the given set of items.
 
     * Optional parts, such as :regexp:`?`
     * :regexp:`^` and :regexp:`$`
