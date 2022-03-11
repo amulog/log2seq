@@ -115,7 +115,7 @@ class HeaderParser(_HeaderParserBase):
     * date (datetime.date): year, month, day
     * time (datetime.time): hour, minute, second, microsecond, tzinfo
 
-    If some of the Items not used, please add the values
+    If some Items are not used, please add the values
     (in the specified type) in defaults.
     Note that "year" is missing in some logging framework
     (e.g., default syslogd configuration).
@@ -191,9 +191,10 @@ class HeaderParser(_HeaderParserBase):
         if separator is None:
             sep = r'\s+'
         else:
-            sep = r'[' + separator + ']+'
+            sep = r'[' + re.escape(separator) + r']+'
+        sep_opt = r'(' + sep + r')?'
 
-        l_item_regex = []
+        l_item_regex = [sep_opt]  # separator in line head is optional
         for i, item in enumerate(items):
             if i == len(items) - 1:
                 # last item: no separator
@@ -236,10 +237,11 @@ class HeaderParser(_HeaderParserBase):
             return None
         else:
             for item in self._l_item:
-                tmp = item.pick(mo)
-                if tmp is not None:
-                    key, val = tmp
-                    items[key] = val
+                if not item.dummy:
+                    tmp = item.pick(mo)
+                    if tmp is not None:
+                        key, val = tmp
+                        items[key] = val
             if self._reformat:
                 items = self._reformat_timestamp(items)
             return items
@@ -368,12 +370,15 @@ class Item(ABC):
             Extracted value for this :class:`Item`. Any type, depending on the class.
             If not specified, a matched string value is returned as is.
         """
-        return mo[self.match_name]
+        try:
+            return mo[self.match_name]
+        except IndexError:
+            raise IndexError("no match_name {0}".format(self.match_name))
 
 
 class Statement(Item):
     """Item for statement part.
-    Usually it includes all strings except header part.
+    Usually it includes all strings except header part with greedy match.
     """
     _match_name = _KEY_STATEMENT
     _value_name = _KEY_STATEMENT
@@ -511,6 +516,46 @@ class Time(Item):
         if string == "Z":
             return datetime.timezone.utc
 
+        # referring official _strptime.py (v3.7.2)
+        z = string.lower()
+        if z[3] == ':':
+            z = z[:3] + z[4:]
+            if len(z) > 5:
+                if z[5] != ':':
+                    raise ValueError
+                z = z[:5] + z[6:]
+        hours = int(z[1:3])
+        minutes = int(z[3:5])
+        seconds = int(z[5:7] or 0)
+        gmtoff = (hours * 60 * 60) + (minutes * 60) + seconds
+        gmtoff_remainder = z[8:]
+        gmtoff_remainder_padding = "0" * (6 - len(gmtoff_remainder))
+        gmtoff_fraction = int(gmtoff_remainder + gmtoff_remainder_padding)
+        if z.startswith("-"):
+            gmtoff = -gmtoff
+            gmtoff_fraction = -gmtoff_fraction
+        tzdelta = datetime.timedelta(seconds=gmtoff,
+                                     microseconds=gmtoff_fraction)
+        return datetime.timezone(tzdelta)
+
+
+class TimeZone(Item):
+    """Item for timezone.
+
+    | e.g., :samp:`+0900`
+    """
+    _match_name = "timezone"
+    _value_name = _KEY_TZ
+
+    @property
+    def pattern(self):
+        return r'(?P<tz>Z|([+-](\d{2})(\:)?(\d{2})))'  # timezone
+
+    def pick_value(self, mo):
+        return self.parse_tz(mo.group(_KEY_TZ))
+
+    @staticmethod
+    def parse_tz(string):
         # referring official _strptime.py (v3.7.2)
         z = string.lower()
         if z[3] == ':':

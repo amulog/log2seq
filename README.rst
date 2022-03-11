@@ -16,7 +16,7 @@ log2seq
 
 .. image:: https://travis-ci.com/amulog/log2seq.svg?branch=master
    :alt: Travis CI
-   :target: https://travis-ci.com/github/cpflat/log2seq
+   :target: https://travis-ci.com/github/amulog/log2seq
 
 .. image:: https://readthedocs.org/projects/log2seq/badge/?version=latest
    :alt: Documentation Status

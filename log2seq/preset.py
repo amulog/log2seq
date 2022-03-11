@@ -90,6 +90,44 @@ def default():
                      default_statement_parser())
 
 
+def apache_errorlog_parser():
+    header_rule1 = [
+        String("weekday", dummy=True),
+        MonthAbbreviation(),
+        Digit("day"),
+        Time(),
+        Digit("year"),
+        String("severityname"),
+        UserItem("client", r"client", optional=True, dummy=True),
+        Hostname("host", optional=True),
+        Statement()
+    ]
+    separator1 = " []"
+    p1 = HeaderParser(header_rule1, separator=separator1)
+
+    header_rule2 = [
+        String("weekday", dummy=True),
+        MonthAbbreviation(),
+        Digit("day"),
+        Time(),
+        Digit("year"),
+        UserItem("core", r"core", dummy=True),
+        String("severityname"),
+        UserItem("pid", r"pid", dummy=True),
+        Digit("processid"),
+        UserItem("tid", r"tid", dummy=True),
+        Digit("threadid"),
+        UserItem("client", r"client", optional=True, dummy=True),
+        Hostname("host", optional=True),
+        Statement()
+    ]
+    separator2 = " []:"
+    p2 = HeaderParser(header_rule2, separator=separator2)
+
+    return LogParser([p1, p2],
+                     default_statement_parser())
+
+
 def load_parser_script(script_filepath):
     import sys
     import os.path
