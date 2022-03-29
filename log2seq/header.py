@@ -162,6 +162,7 @@ class HeaderParser(_HeaderParserBase):
         self._l_item = items
 
         self._items_to_pick = self._get_items_to_pick(items)
+        self._optional_check(items)
         self._statement_check(items)
         self._duplication_check(self._items_to_pick)
 
@@ -188,6 +189,13 @@ class HeaderParser(_HeaderParserBase):
         return items_to_pick
 
     @staticmethod
+    def _optional_check(items):
+        mandatory_items = [item for item in items if item.optional is False]
+        if len(mandatory_items) == 0:
+            msg = "more than one Item (usually Statement) need to be non-optional"
+            raise _common.ParserDefinitionError(msg)
+
+    @staticmethod
     def _statement_check(items):
         names = [item.value_name for item in items]
         if _KEY_STATEMENT not in names:
@@ -208,32 +216,48 @@ class HeaderParser(_HeaderParserBase):
 
     @staticmethod
     def make_regex_separator(items, separator):
+
+        def _optional_pattern(pattern):
+            return r'(' + pattern + r')?'
+
         if separator is None:
             sep = r'\s+'
         else:
             sep = r'[' + re.escape(separator) + r']+'
-        sep_opt = r'(' + sep + r')?'
+        sep_opt = _optional_pattern(sep)
 
-        l_item_regex = [sep_opt]  # separator in line head is optional
-        for i, item in enumerate(items):
-            if i == len(items) - 1:
-                # last item: no separator
-                restr = item.get_regex(separator=None)
+        ind_first_mandatory_item = [ind for ind, item in enumerate(items)
+                                    if item.optional is False][0]
+        l_item_patterns = []
+        for ind, item in enumerate(items):
+            tmp_pattern = item.get_regex()
+            # add separator based on the item index
+            if ind < ind_first_mandatory_item:
+                # left of every mandatory item:
+                # add separator to the right of the item
+                tmp_pattern = tmp_pattern + sep
+            elif ind == ind_first_mandatory_item:
+                # first mandatory item: no separator
+                # (turning point of the rule to add separators)
+                pass
             else:
-                # others: with separator
-                # (if the item is optional,
-                # the separator is included in the optional part)
-                restr = item.get_regex(separator=sep)
-            l_item_regex.append(restr)
-        l_item_regex.append(sep_opt)  # separator in line tail is optional
-        return "".join(l_item_regex)
+                # otherwise: add separator to the left of the item
+                tmp_pattern = sep + tmp_pattern
+            # enclose item pattern and separator as optional part
+            if item.optional:
+                tmp_pattern = _optional_pattern(tmp_pattern)
+            l_item_patterns.append(tmp_pattern)
+
+        # optional separators in line head and tail
+        l_item_patterns = [sep_opt] + l_item_patterns + [sep_opt]
+        return "".join(l_item_patterns)
 
     @staticmethod
     def make_pattern_full_format(items, full_format):
         tmp_format = re.sub(" +", r"\\s+", full_format)
         for i, item in reversed(list(enumerate(items))):
             replacer = "<" + str(i) + ">"
-            item_regex = item.get_regex(separator=None)
+            item_regex = item.get_regex()
             if replacer not in tmp_format:
                 msg = ("Invalid full_format pattern: "
                        "no replacer {0}".format(replacer))
@@ -326,31 +350,27 @@ class Item(ABC):
         """
         return self._value_name
 
-    def get_regex(self, separator=None):
-        """Get regular expression pattern string of this :class:`Item` instance.
-        The pattern string is modified considering the options
-        for :class:`HeaderParser` and this :class:`Item`.
+    def test(self, string):
+        """Test this Item will match the input string or not.
+        Note that this function is only for debugging your parser script
+        (because it generates internal re.Pattern for every call).
 
         Args:
-            separator (str, optional): separator regular expression pattern.
-                If given, it follows the main pattern.
+            string: Input string to test matching.
 
         Returns:
-            str: regular expression pattern of this Item instance.
+            re.Match or None
         """
+        pattern = re.compile(r'^' + self.get_regex() + r'$')
+        return pattern.match(string)
 
-        return self._enclose_regex(self.pattern, separator)
-
-    def _enclose_regex(self, core, separator):
+    def get_regex(self):
+        """Get regular expression pattern string of this :class:`Item` instance.
+        """
         if self._dummy:
-            restr = core
+            return self.pattern
         else:
-            restr = r'(?P<' + self.match_name + r'>' + core + ')'
-        if separator is not None:
-            restr += separator
-        if self._optional:
-            restr = r'(' + restr + ')?'
-        return restr
+            return r'(?P<' + self.match_name + r'>' + self.pattern + ')'
 
     def pick(self, mo):
         """Get value name and the extracted values
@@ -775,9 +795,27 @@ class Digit(NamedItem):
 class String(NamedItem):
     """:class:`NamedItem` for a string.
 
-    The string can include digit and alphabet, without any symbol strings.
+    The string can include digit and alphabet (no symbol strings in default).
+    If you want to allow some additional symbol strings,
+    specify it to symbol argument.
+
+    Args:
+        symbols (str, optional)
     """
-    pattern = r'[0-9A-Za-z]+'
+
+    def __init__(self, name, symbols=None, **kwargs):
+        super().__init__(name, **kwargs)
+
+        if symbols is not None:
+            if "-" in symbols:
+                symbols = symbols.replace("-", "") + "-"
+            self._pattern = r'[a-zA-Z0-9' + symbols + r']+'
+        else:
+            self._pattern = r'[a-zA-Z0-9]+'
+
+    @property
+    def pattern(self):
+        return self._pattern
 
 
 class Hostname(NamedItem):

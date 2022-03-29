@@ -113,9 +113,9 @@ def apache_errorlog_parser():
                    Digit("year")],
                   separator=" "),
         String("severityname"),
-        ItemGroup([UserItem("client", r"client", optional=True, dummy=True),
+        ItemGroup([UserItem("client", r"client", dummy=True),
                    Hostname("host", optional=True)],
-                  separator=None),
+                  separator=None, optional=True),
         Statement()
     ]
     separator1 = " []"

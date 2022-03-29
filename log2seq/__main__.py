@@ -69,18 +69,21 @@ def format_parsed_statement(words, separators, format_type):
               help="output format type, one of [object, words]")
 @click.option("--show-input", "-i", "show_input", is_flag=True,
               help="additionally show the input string line as is")
+@click.option("--skip-success", "skip_success", is_flag=True,
+              help="only show failed messages")
 @click.option("--as-statement", "-s", "as_statement", is_flag=True,
               help="consider input as statement (without header)")
 @click.option("--verbose", "-v", is_flag=True,
               help="verbose output to stderr")
-def main(files, parser, encoding, output, format_type, show_input, as_statement, verbose):
+def main(files, parser, encoding, output, format_type, show_input,
+         skip_success, as_statement, verbose):
     """Parse log messages given in FILES (or stdin if FILES not given)."""
 
     if format_type not in ("object", "words"):
         click.BadParameter("invalid type")
 
     from .preset import default
-    from log2seq._common import load_parser_script
+    from log2seq._common import load_parser_script, LogParseFailure
     if parser:
         lp = load_parser_script(parser)
     else:
@@ -93,18 +96,25 @@ def main(files, parser, encoding, output, format_type, show_input, as_statement,
 
     for line in iter_lines(files, encoding=encoding):
         if line != "":
-            if show_input:
-                f_output.write(line + "\n")
-            if as_statement:
-                words, seps = lp.process_statement(
-                    line, verbose=verbose
-                )
-                buf = format_parsed_statement(words, seps, format_type)
+            try:
+                buf = ""
+                if show_input:
+                    buf += line + "\n"
+                if as_statement:
+                    words, seps = lp.process_statement(
+                        line, verbose=verbose
+                    )
+                    buf += format_parsed_statement(words, seps, format_type)
+                else:
+                    pline = lp.process_line(line, verbose=verbose)
+                    buf += format_parsed_line(pline, format_type)
+            except LogParseFailure as e:
+                if show_input:
+                    sys.stderr.write(line + "\n")
+                raise e
             else:
-                pline = lp.process_line(line, verbose=verbose)
-                buf = format_parsed_line(pline, format_type)
-
-            f_output.write(buf + "\n")
+                if not skip_success:
+                    f_output.write(buf + "\n")
 
     f_output.close()
 

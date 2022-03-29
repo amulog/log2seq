@@ -144,7 +144,7 @@ class LogParser:
         Returns:
             dict: parsed data.
         """
-        line = line.rstrip("\n")
+        line = strip_linefeed(line)
         if line == "":
             return None
         try:
@@ -154,10 +154,12 @@ class LogParser:
                 return None
             else:
                 raise e
+
         mes = d[KEY_STATEMENT]
-        l_w, l_s = self.process_statement(mes, verbose)
-        d[KEY_WORDS] = l_w
-        d[KEY_SYMBOLS] = l_s
+        if mes is not None:
+            l_w, l_s = self.process_statement(mes, verbose)
+            d[KEY_WORDS] = l_w
+            d[KEY_SYMBOLS] = l_s
         return d
 
 
@@ -201,3 +203,7 @@ def load_parser_script(script_filepath):
     # obtain parser object
     lp = getattr(script_mod, PARSER_OBJECT_NAME)
     return lp
+
+
+def strip_linefeed(string):
+    return string.rstrip("\r\n")
