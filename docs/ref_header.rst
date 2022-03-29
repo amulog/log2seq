@@ -23,6 +23,8 @@ Basic items
 Timestamp items
 ---------------
 
+.. autoclass:: log2seq.header.UnixTime
+
 .. autoclass:: log2seq.header.DatetimeISOFormat
 
 .. autoclass:: log2seq.header.Date
@@ -30,6 +32,14 @@ Timestamp items
 .. autoclass:: log2seq.header.Time
 
 .. autoclass:: log2seq.header.MonthAbbreviation
+
+.. autoclass:: log2seq.header.DemicalSecond
+
+.. autoclass:: log2seq.header.TimeZone
+
+.. autoclass:: log2seq.header.DateConcat
+
+.. autoclass:: log2seq.header.TimeConcat
 
 
 Variable items

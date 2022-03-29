@@ -19,7 +19,7 @@ _KEY_DAY = "day"
 _KEY_HOUR = "hour"
 _KEY_MINUTE = "minute"
 _KEY_SECOND = "second"
-_KEY_SECOND_DECIMAL = "dsecond"  # decimal part of seconds
+_KEY_MICROSECOND = "microsecond"
 _KEY_TZ = "tz"
 
 
@@ -191,7 +191,7 @@ class HeaderParser(_HeaderParserBase):
     def _statement_check(items):
         names = [item.value_name for item in items]
         if _KEY_STATEMENT not in names:
-            msg = "Statement Item is needed"
+            msg = "one Statement Item is mandatory in header rules"
             raise _common.ParserDefinitionError(msg)
 
     @staticmethod
@@ -225,6 +225,7 @@ class HeaderParser(_HeaderParserBase):
                 # the separator is included in the optional part)
                 restr = item.get_regex(separator=sep)
             l_item_regex.append(restr)
+        l_item_regex.append(sep_opt)  # separator in line tail is optional
         return "".join(l_item_regex)
 
     @staticmethod
@@ -234,7 +235,8 @@ class HeaderParser(_HeaderParserBase):
             replacer = "<" + str(i) + ">"
             item_regex = item.get_regex(separator=None)
             if replacer not in tmp_format:
-                msg = "Invalid full_format pattern"
+                msg = ("Invalid full_format pattern: "
+                       "no replacer {0}".format(replacer))
                 raise _common.ParserDefinitionError(msg)
             tmp_format = tmp_format.replace(replacer, item_regex, 1)
 
@@ -421,6 +423,24 @@ class Statement(Item):
         return r'.*'
 
 
+class YearWithoutCentury(Item):
+    """Item for year without century.
+    Digits with 2 characters will match
+    (e.g., :samp:`21` for year 2021)
+    """
+    _match_name = "year_nocentury"
+    _value_name = "year"
+
+    @property
+    def pattern(self):
+        return r'[0-9]{2}'
+
+    def pick_value(self, mo):
+        """Returns year (including century) in digit format (integer)."""
+        century = datetime.datetime.now().year // 100
+        return century * 100 + int(mo[self.match_name])
+
+
 class MonthAbbreviation(Item):
     """Item for abbreviated month names.
     Strings with first capitalized 3 characters will match
@@ -513,6 +533,7 @@ class Time(Item):
     """
     _match_name = "iso_time"
     _value_name = _KEY_TIME
+    _key_demical_second = "dsecond"
 
     @property
     def pattern(self):
@@ -529,18 +550,24 @@ class Time(Item):
         # manual parse
         return self.parse_timestr(mo)
 
-    @staticmethod
-    def parse_timestr(mo):
+    @classmethod
+    def parse_timestr(cls, mo):
         d = {"hour": int(mo.group(_KEY_HOUR)),
              "minute": int(mo.group(_KEY_MINUTE)),
              "second": int(mo.group(_KEY_SECOND))}
-        if mo.group(_KEY_SECOND_DECIMAL) is not None:
-            size = len(mo.group(_KEY_SECOND_DECIMAL))
-            decimal = int(mo.group(_KEY_SECOND_DECIMAL))
-            microsec = decimal / (10 ** size) * 10 ** 6
-            d["microsecond"] = int(microsec)
-        if mo.group(_KEY_TZ) is not None:
-            d["tzinfo"] = Time.parse_tz(mo.group(_KEY_TZ))
+        try:
+            if mo.group(cls._key_demical_second) is not None:
+                size = len(mo.group(cls._key_demical_second))
+                decimal = int(mo.group(cls._key_demical_second))
+                microsec = decimal / (10 ** size) * 10 ** 6
+                d["microsecond"] = int(microsec)
+        except IndexError:
+            pass
+        try:
+            if mo.group(_KEY_TZ) is not None:
+                d["tzinfo"] = Time.parse_tz(mo.group(_KEY_TZ))
+        except IndexError:
+            pass
 
         return datetime.time(**d)
 
@@ -570,6 +597,28 @@ class Time(Item):
         tzdelta = datetime.timedelta(seconds=gmtoff,
                                      microseconds=gmtoff_fraction)
         return datetime.timezone(tzdelta)
+
+
+class DemicalSecond(Item):
+    """Item for demical seconds.
+
+    | e.g., :samp:`678` as milliseconds
+
+    | e.g., :samp:`123456` as microseconds
+    """
+    _match_name = "iso_time"
+    _value_name = _KEY_MICROSECOND
+
+    @property
+    def pattern(self):
+        return r'[0-9]+'
+
+    def pick_value(self, mo):
+        string = mo[self.match_name]
+        size = len(string)
+        decimal = int(string)
+        microsec = decimal / (10 ** size) * 10 ** 6
+        return int(microsec)
 
 
 class TimeZone(Item):
@@ -610,6 +659,83 @@ class TimeZone(Item):
         tzdelta = datetime.timedelta(seconds=gmtoff,
                                      microseconds=gmtoff_fraction)
         return datetime.timezone(tzdelta)
+
+
+class UnixTime(Item):
+    """Item for unixtime integer.
+
+    | e.g., :samp:`1551024123` for 2019-02-25 01:02:03
+    """
+    _match_name = "unixtime"
+    _value_name = _KEY_TIMESTAMP
+
+    @property
+    def pattern(self):
+        return r'[0-9]+'
+
+    def pick_value(self, mo):
+        return datetime.datetime.fromtimestamp(int(mo.group(self._match_name)))
+
+
+class DateConcat(Item):
+    """Item for date without separators.
+
+    | e.g., :samp:`20190225` for 2019-02-25
+
+    | e.g., :samp:`190225` for 2019-02-25 (no_century is True)
+
+    Args:
+        no_century (bool, optional): If true, abbreviate year by removing century.
+    """
+    _match_name = "date_concat"
+    _value_name = _KEY_DATE
+
+    def __init__(self, no_century=False, **kwargs):
+        super().__init__(**kwargs)
+        self._no_century = no_century
+
+        if no_century:
+            self._pattern = r'[0-9]{6}'
+        else:
+            self._pattern = r'[0-9]{8}'
+
+    @property
+    def pattern(self):
+        return self._pattern
+
+    def pick_value(self, mo):
+        string = mo[self.match_name]
+        if self._no_century:
+            century = datetime.datetime.now().year // 100
+            year = century * 100 + int(string[0:2])
+            d = {"year": year,
+                 "month": int(string[2:4]),
+                 "day": int(string[4:6])}
+        else:
+            d = {"year": int(string[0:4]),
+                 "month": int(string[4:6]),
+                 "day": int(string[6:8])}
+        return datetime.date(**d)
+
+
+class TimeConcat(Item):
+    """Item for time without separators.
+
+    | e.g., :samp:`010203` for 01:02:03
+    """
+    _match_name = "time_concat"
+    _value_name = _KEY_TIME
+
+    @property
+    def pattern(self):
+        return r'[0-9]{6}'
+
+    def pick_value(self, mo):
+        string = mo[self.match_name]
+        d = {"hour": int(string[0:2]),
+             "minute": int(string[2:4]),
+             "second": int(string[4:6])}
+        return datetime.time(**d)
 
 
 class NamedItem(Item, ABC):
@@ -663,7 +789,7 @@ class Hostname(NamedItem):
     (This is because hostname can include various values
     depending on the devices or OSes.)
     """
-    pattern = (r'([a-zA-Z0-9:][a-zA-Z0-9:.-]*[a-zA-Z0-9]+)'  # len >= 2
+    pattern = (r'([a-zA-Z0-9:][a-zA-Z0-9:._-]*[a-zA-Z0-9]+)'  # len >= 2
                r'|([a-zA-Z0-9])')  # len == 1
 
 
@@ -682,12 +808,24 @@ class UserItem(NamedItem):
     Args:
         name: same as NamedItem.
         pattern: regular expression pattern of this Item instance.
+        strip (str, optional): specified characters will be stripped
+            with str.strip() in the parsed object.
     """
 
-    def __init__(self, name, pattern, **kwargs):
+    def __init__(self, name, pattern, strip=None, **kwargs):
         super().__init__(name, **kwargs)
         self._pattern = pattern
+        self._strip = strip
 
     @property
     def pattern(self):
         return self._pattern
+
+    def pick_value(self, mo):
+        try:
+            if self._strip is None:
+                return mo[self.match_name]
+            else:
+                return mo[self.match_name].strip(self._strip)
+        except IndexError:
+            raise IndexError("no match_name {0}".format(self.match_name))

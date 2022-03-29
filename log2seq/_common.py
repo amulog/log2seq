@@ -67,9 +67,11 @@ class LogParser:
             one or multiple HeaderParser instance to use.
         statement_parser (:obj:`~statement.StatementParser`):
             one StatementParser instance to use.
+        ignore_failure (bool, optional):
+            If true, ignore non-matching lines with given header parsers.
     """
 
-    def __init__(self, header_parsers, statement_parser):
+    def __init__(self, header_parsers, statement_parser, ignore_failure=False):
         from .header import _HeaderParserBase
         if isinstance(header_parsers, Iterable):
             self.header_parsers = header_parsers
@@ -78,6 +80,7 @@ class LogParser:
         else:
             raise TypeError
         self.statement_parser = statement_parser
+        self._ignore_failure = ignore_failure
 
     def process_header(self, line, verbose=False):
         """Parse header part in a log message.
@@ -144,7 +147,13 @@ class LogParser:
         line = line.rstrip("\n")
         if line == "":
             return None
-        d = self.process_header(line, verbose)
+        try:
+            d = self.process_header(line, verbose)
+        except LogParseFailure as e:
+            if self._ignore_failure:
+                return None
+            else:
+                raise e
         mes = d[KEY_STATEMENT]
         l_w, l_s = self.process_statement(mes, verbose)
         d[KEY_WORDS] = l_w
