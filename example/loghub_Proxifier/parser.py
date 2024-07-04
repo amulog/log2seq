@@ -23,8 +23,8 @@ header_rule2 = [
 
 defaults = {"year": datetime.datetime.now().year}
 
-header_parser1 = HeaderParser(header_rule1, separator="[]-", defaults=defaults)
-header_parser2 = HeaderParser(header_rule2, separator="[]", defaults=defaults)
+header_parser1 = HeaderParser(header_rule1, separator="[]- ", defaults=defaults)
+header_parser2 = HeaderParser(header_rule2, separator="[] ", defaults=defaults)
 
 statement_parser = preset.default_statement_parser()
 
