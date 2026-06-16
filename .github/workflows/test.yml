@@ -2,6 +2,7 @@ name: test
 
 on:
   push:
+    branches: ['**']  # all branches, not tags (tag pushes are handled by publish.yml)
   pull_request:
   workflow_dispatch:
 
