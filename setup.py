@@ -29,7 +29,7 @@ setup(name=package_name,
       description='A tool to parse syslog-like messages into word sequences',
       long_description=load_readme(),
       author='Satoru Kobayashi',
-      author_email='sat@nii.ac.jp',
+      author_email='sat@3at.work',
       url='https://github.com/cpflat/log2seq/',
       classifiers=[
           'Development Status :: 4 - Beta',
