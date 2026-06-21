@@ -60,6 +60,28 @@ class TestHeader(unittest.TestCase):
             assert ts.time().second == 33
             assert ts.time().microsecond == 12345
 
+    def test_year_without_century(self):
+        # The century completion must be deterministic (no datetime.now()
+        # dependence). The default prefix is 20 (2000-2099), reproducing the
+        # previous now()-based behavior for runs in this century.
+        from log2seq import header
+
+        item = header.YearWithoutCentury()
+        assert item.pick_value(item.test("21")) == 2021
+        assert item.pick_value(item.test("99")) == 2099
+        # Explicit override yields a year the old now()-based code could not.
+        item19 = header.YearWithoutCentury(century=19)
+        assert item19.pick_value(item19.test("21")) == 1921
+
+        # DateConcat(no_century=True) shares the same completion.
+        dc = header.DateConcat(no_century=True)
+        assert dc.pick_value(dc.test("210905")) == datetime.date(2021, 9, 5)
+        dc19 = header.DateConcat(no_century=True, century=19)
+        assert dc19.pick_value(dc19.test("210905")) == datetime.date(1921, 9, 5)
+        # Full (8-digit) date is unaffected by the century option.
+        dc8 = header.DateConcat()
+        assert dc8.pick_value(dc8.test("19990905")) == datetime.date(1999, 9, 5)
+
     def test_items(self):
         from log2seq import header
 

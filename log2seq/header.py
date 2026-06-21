@@ -447,9 +447,22 @@ class YearWithoutCentury(Item):
     """Item for year without century.
     Digits with 2 characters will match
     (e.g., :samp:`21` for year 2021)
+
+    Args:
+        century (int, optional): Century prefix used to complete the
+            two-digit year, e.g. :samp:`20` for 2000-2099 or :samp:`19`
+            for 1900-1999. Defaults to 20.
+
+            (Previously the century was derived from :func:`datetime.now`,
+            which made the parsed year depend on when the parser ran.
+            The default 20 reproduces that behavior for any run in 2000-2099.)
     """
     _match_name = "year_nocentury"
     _value_name = "year"
+
+    def __init__(self, century=20, **kwargs):
+        super().__init__(**kwargs)
+        self._century = century
 
     @property
     def pattern(self):
@@ -457,8 +470,7 @@ class YearWithoutCentury(Item):
 
     def pick_value(self, mo):
         """Returns year (including century) in digit format (integer)."""
-        century = datetime.datetime.now().year // 100
-        return century * 100 + int(mo[self.match_name])
+        return self._century * 100 + int(mo[self.match_name])
 
 
 class MonthAbbreviation(Item):
@@ -706,13 +718,18 @@ class DateConcat(Item):
 
     Args:
         no_century (bool, optional): If true, abbreviate year by removing century.
+        century (int, optional): Century prefix used to complete the two-digit
+            year when no_century is true, e.g. :samp:`20` for 2000-2099 or
+            :samp:`19` for 1900-1999. Defaults to 20. (Previously derived from
+            :func:`datetime.now`; the default 20 reproduces that for 2000-2099.)
     """
     _match_name = "date_concat"
     _value_name = _KEY_DATE
 
-    def __init__(self, no_century=False, **kwargs):
+    def __init__(self, no_century=False, century=20, **kwargs):
         super().__init__(**kwargs)
         self._no_century = no_century
+        self._century = century
 
         if no_century:
             self._pattern = r'[0-9]{6}'
@@ -726,8 +743,7 @@ class DateConcat(Item):
     def pick_value(self, mo):
         string = mo[self.match_name]
         if self._no_century:
-            century = datetime.datetime.now().year // 100
-            year = century * 100 + int(string[0:2])
+            year = self._century * 100 + int(string[0:2])
             d = {"year": year,
                  "month": int(string[2:4]),
                  "day": int(string[4:6])}
