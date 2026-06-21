@@ -6,12 +6,17 @@ from log2seq.header import *
 from log2seq.statement import *
 
 
+# loghub log_format:
+#   <Date> <Time>  <Pid>  <Tid> <Level> <Component>: <Content>
+# <Component> is the field before the first ": ", so match the non-colon run and
+# let ":" (in the separator set) delimit it from the content.
 header_rule = [
     ItemGroup([Digit("month"), Digit("day")], separator="-"),
     Time(),
     Digit("pid"),
     Digit("tid"),
     UserItem("level", r"[A-Z]"),
+    UserItem("component", r"[^:]+"),
     Statement()
 ]
 

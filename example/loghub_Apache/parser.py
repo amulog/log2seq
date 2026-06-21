@@ -14,13 +14,14 @@ header_rule1 = [
                Digit("year")],
               separator=" "),
     String("severityname"),
-    ItemGroup([UserItem("client", r"client", dummy=True),
-               Hostname("host", optional=True)],
-              separator=None, optional=True),
     Statement()
 ]
-separator = " []"
-header_parser1 = HeaderParser(header_rule1, separator=separator)
+# The brackets around time and level are fixed delimiters, so pin them with
+# full_format instead of treating "[" / "]" as generic separators. This keeps a
+# leading "[client <ip>]" (part of loghub's <Content>) inside the message rather
+# than consuming it as a host item.
+full_format = r"\[<0>\] \[<1>\] <2>"
+header_parser1 = HeaderParser(header_rule1, full_format=full_format)
 
 header_rule2 = [
     Statement()

@@ -10,9 +10,14 @@ header_rule1 = [
     ItemGroup([Digit("month"),
                Digit("day"),
                Time()], separator=" ."),
-    UserItem("env", r"[a-zA-Z0-9._* ]+", strip=" "),
+    UserItem("env", r".+?"),
     Statement()
 ]
+# loghub's <Program> is everything up to the first " - " (it can contain "-",
+# e.g. "git-remote-https.exe", and a " *64" suffix). Pin " - " as the delimiter
+# with full_format and match the program non-greedily so it stops at that first
+# " - " rather than being split on every "-".
+full_format1 = r"\[<0>\] <1> - <2>"
 
 header_rule2 = [
     ItemGroup([Digit("month"),
@@ -23,7 +28,7 @@ header_rule2 = [
 
 defaults = {"year": datetime.datetime.now().year}
 
-header_parser1 = HeaderParser(header_rule1, separator="[]- ", defaults=defaults)
+header_parser1 = HeaderParser(header_rule1, full_format=full_format1, defaults=defaults)
 header_parser2 = HeaderParser(header_rule2, separator="[] ", defaults=defaults)
 
 statement_parser = preset.default_statement_parser()

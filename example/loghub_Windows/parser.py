@@ -6,8 +6,10 @@ from log2seq.header import *
 from log2seq.statement import *
 
 
+# loghub log_format:
+#   <Date> <Time>, <Level>  <Component>  <Content>
 header_rule = [
-    ItemGroup([Date()], separator=""),
+    Date(),
     Time(),
     String("level"),
     String("component"),
@@ -15,6 +17,11 @@ header_rule = [
 ]
 
 header_parser = HeaderParser(header_rule, separator=" ,\t")
+
+# CBS logs interleave header-less continuation/sub-record lines that carry no
+# "<Date> <Time>," prefix, e.g. "CSIPERF:TXCOMMIT;200" or "  Scavenge (8): ...".
+# Take such a line as-is for the message (there is no timestamp to extract).
+header_parser_cont = HeaderParser([Statement()], reformat_timestamp=False)
 
 pattern_windows_fullpath = r"[A-Z]:(\\[a-zA-Z0-9.*?_-])+"
 
@@ -29,5 +36,5 @@ statement_rules = [
 
 statement_parser = StatementParser(statement_rules)
 
-parser = LogParser(header_parser, statement_parser)
+parser = LogParser([header_parser, header_parser_cont], statement_parser)
 
