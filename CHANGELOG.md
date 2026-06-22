@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Declare the `click` dependency in `install_requires` (it was missing, so the
   CLI raised `ImportError` after a fresh `pip install`). Drop the unused
   `numpy` / `python-dateutil` runtime requirements.
+- `apache_errorlog_parser` no longer hardcodes the module name `core`, so 2.4
+  error lines from other modules (`mpm_event`, `ssl`, `authz_core`, ...) parse
+  instead of raising `LogParseFailure`. The module name is now exposed as the
+  `modulename` field.
 
 ## [0.3.1] - 2022-03-29
 

@@ -128,7 +128,7 @@ def apache_errorlog_parser():
                    Time(),
                    Digit("year")],
                   separator=" "),
-        ItemGroup([UserItem("core", r"core", dummy=True),
+        ItemGroup([String("modulename", symbols="_"),
                    String("severityname")],
                   separator=":"),
         ItemGroup([UserItem("pid", r"pid", dummy=True),
