@@ -47,5 +47,10 @@ setup(name=package_name,
 
       packages=['log2seq'],
       install_requires=load_requirements(),
+      entry_points={
+          "console_scripts": [
+              "log2seq=log2seq.__main__:main",
+          ],
+      },
       test_suite="tests",
       )
