@@ -6,20 +6,51 @@ import unittest
 class TestHeader(unittest.TestCase):
 
     def test_default(self):
-        input_lines = [
-            "Apr  1 02:23:45 host-name.example.org message here",
-            "2020 May  2 22:22:22 192.0.2.1 message there",
-            "Jun 30 11:11:11.012345+09:00 2001:db8::beef something",
-            "Jul 12 22:22:22-06:00 host something"
-            "2112-09-03 11:22:33 host something failure"
-            "2112-09-03 01:02:03.987654+09:00 host something"
-        ]
-
         from log2seq.preset import default
         hp = default()
-        for line in input_lines:
-            ret = hp.process_header(line)
-            assert ret is not None
+
+        # syslog-style lines carry no year; default() fills it from the current
+        # year, so assert host/message/time components but not the (run-dependent)
+        # year.
+        ret = hp.process_header("Apr  1 02:23:45 host-name.example.org message here")
+        assert ret["host"] == "host-name.example.org"
+        assert ret["message"] == "message here"
+        ts = ret["timestamp"]
+        assert (ts.month, ts.day, ts.hour, ts.minute, ts.second) == (4, 1, 2, 23, 45)
+
+        ret = hp.process_header("Jun 30 11:11:11.012345+09:00 2001:db8::beef something")
+        assert ret["host"] == "2001:db8::beef"
+        assert ret["message"] == "something"
+        ts = ret["timestamp"]
+        assert (ts.month, ts.day, ts.hour, ts.minute, ts.second, ts.microsecond) \
+            == (6, 30, 11, 11, 11, 12345)
+        assert ts.utcoffset() == datetime.timedelta(hours=9)
+
+        ret = hp.process_header("Jul 12 22:22:22-06:00 host something")
+        assert ret["host"] == "host"
+        assert ret["message"] == "something"
+        ts = ret["timestamp"]
+        assert (ts.month, ts.day, ts.hour, ts.minute, ts.second) == (7, 12, 22, 22, 22)
+        assert ts.utcoffset() == datetime.timedelta(hours=-6)
+
+        # An explicit year makes the whole timestamp deterministic.
+        ret = hp.process_header("2020 May  2 22:22:22 192.0.2.1 message there")
+        assert ret["host"] == "192.0.2.1"
+        assert ret["message"] == "message there"
+        assert ret["timestamp"] == datetime.datetime(2020, 5, 2, 22, 22, 22)
+
+        # ISO format (Date + Time) is parsed by the default's second rule.
+        ret = hp.process_header("2112-09-03 11:22:33 host something failure")
+        assert ret["host"] == "host"
+        assert ret["message"] == "something failure"
+        assert ret["timestamp"] == datetime.datetime(2112, 9, 3, 11, 22, 33)
+
+        ret = hp.process_header("2112-09-03 01:02:03.987654+09:00 host something")
+        assert ret["host"] == "host"
+        assert ret["message"] == "something"
+        ts = ret["timestamp"]
+        assert ts.replace(tzinfo=None) == datetime.datetime(2112, 9, 3, 1, 2, 3, 987654)
+        assert ts.utcoffset() == datetime.timedelta(hours=9)
 
     def test_full_format(self):
         input_lines = ["Sep  1 01:02:03 host daemon[12345]: test: message ::1",
