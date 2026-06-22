@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `log2seq` console-script entry point, so `log2seq ...` works after install
+  (equivalent to `python -m log2seq ...`).
+
 ### Fixed
 
 - loghub example parsers (`example/loghub_*/parser.py`) now align their message
@@ -26,6 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `/sbin/mingetty`) and add a rule for tag-less syslog meta-lines.
   - **Proxifier**: treat `<Program>` as everything up to the first ` - ` (keeps
     names like `git-remote-https.exe`).
+- Two-digit year completion is now deterministic. `YearWithoutCentury` and
+  `DateConcat(no_century=True)` previously derived the century from
+  `datetime.now()`, making the parsed year depend on when the parser ran. They
+  now take an explicit `century` argument (default `20`, i.e. 2000-2099, which
+  reproduces the previous behavior for runs in this century). Pass
+  `century=19` for 1900s logs.
+- Declare the `click` dependency in `install_requires` (it was missing, so the
+  CLI raised `ImportError` after a fresh `pip install`). Drop the unused
+  `numpy` / `python-dateutil` runtime requirements.
 
 ## [0.3.1] - 2022-03-29
 
