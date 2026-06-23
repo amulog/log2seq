@@ -19,7 +19,11 @@ def iter_lines(files, encoding="utf-8"):
             yield text_postprocess(line)
     else:
         for fp in files:
-            if ".tar." in fp:
+            # tar archives (optionally compressed); check before the plain
+            # .gz/.bz2 cases so that e.g. "x.tar.gz" is read as a tar, not gzip.
+            # tarfile.open(mode="r") auto-detects the compression.
+            if fp.endswith((".tar", ".tar.gz", ".tgz",
+                            ".tar.bz2", ".tbz2", ".tar.xz", ".txz")):
                 import tarfile
                 with tarfile.open(fp, 'r') as tar:
                     for info in tar.getmembers():
@@ -103,7 +107,7 @@ def main(files, parser, encoding, output, format_type, as_statement,
     else:
         lp = default()
 
-    f_output = open(output, "w") if output else sys.stdout
+    f_output = open(output, "w", encoding=encoding) if output else sys.stdout
     n_ok = n_fail = 0
     try:
         for line in iter_lines(files, encoding=encoding):

@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI (`python -m log2seq`): read input lazily instead of `readlines()`, so
   large/compressed files no longer load entirely into memory; validate `--type`
   with `click.Choice`; and close the output file reliably (even on error).
+- CLI: detect tar archives by file suffix (`.tar`, `.tar.gz`, `.tgz`, ...)
+  instead of a `".tar."` substring, so plain `.tar` / `.tgz` are handled and
+  names that merely contain `.tar.` are not misread as archives; open
+  `--output` with the same `--encoding` as the input.
 
 ## [0.3.1] - 2022-03-29
 
