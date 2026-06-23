@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error lines from other modules (`mpm_event`, `ssl`, `authz_core`, ...) parse
   instead of raising `LogParseFailure`. The module name is now exposed as the
   `modulename` field.
+- CLI (`python -m log2seq`): read input lazily instead of `readlines()`, so
+  large/compressed files no longer load entirely into memory; validate `--type`
+  with `click.Choice`; and close the output file reliably (even on error).
 
 ## [0.3.1] - 2022-03-29
 

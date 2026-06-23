@@ -15,7 +15,7 @@ def bin_postprocess(line, encoding="utf-8"):
 
 def iter_lines(files, encoding="utf-8"):
     if len(files) == 0:
-        for line in sys.stdin.readlines():
+        for line in sys.stdin:
             yield text_postprocess(line)
     else:
         for fp in files:
@@ -25,21 +25,21 @@ def iter_lines(files, encoding="utf-8"):
                     for info in tar.getmembers():
                         if info.isfile():
                             with tar.extractfile(info) as f:
-                                for line in f.readlines():
+                                for line in f:
                                     yield bin_postprocess(line, encoding=encoding)
             elif fp.endswith(".bz2"):
                 import bz2
                 with bz2.open(fp, 'rt', encoding=encoding) as f:
-                    for line in f.readlines():
+                    for line in f:
                         yield text_postprocess(line)
             elif fp.endswith(".gz"):
                 import gzip
                 with gzip.open(fp, 'r') as f:
-                    for line in f.readlines():
+                    for line in f:
                         yield bin_postprocess(line, encoding=encoding)
             else:
                 with open(fp, 'rt', encoding=encoding) as f:
-                    for line in f.readlines():
+                    for line in f:
                         yield text_postprocess(line)
 
 
@@ -48,6 +48,8 @@ def format_parsed_line(pline, format_type):
         return str(pline)
     elif format_type == "words":
         return " ".join(pline["words"])
+    else:
+        raise ValueError("invalid format type: {0}".format(format_type))
 
 
 def format_parsed_statement(words, separators, format_type):
@@ -55,6 +57,8 @@ def format_parsed_statement(words, separators, format_type):
         return str((words, separators))
     elif format_type == "words":
         return " ".join(words)
+    else:
+        raise ValueError("invalid format type: {0}".format(format_type))
 
 
 @click.command()
@@ -65,8 +69,9 @@ def format_parsed_statement(words, separators, format_type):
               help="encoding to load input data")
 @click.option("--output", "-o", default=None,
               help="output filename")
-@click.option("--type", "-t", "format_type", default="object",
-              help="output format type, one of [object, words]")
+@click.option("--type", "-t", "format_type",
+              type=click.Choice(["object", "words"]), default="object",
+              help="output format type")
 @click.option("--show-input", "-i", "show_input", is_flag=True,
               help="additionally show the input string line as is")
 @click.option("--skip-success", "skip_success", is_flag=True,
@@ -78,9 +83,6 @@ def format_parsed_statement(words, separators, format_type):
 def main(files, parser, encoding, output, format_type, show_input,
          skip_success, as_statement, verbose):
     """Parse log messages given in FILES (or stdin if FILES not given)."""
-
-    if format_type not in ("object", "words"):
-        click.BadParameter("invalid type")
 
     from .preset import default
     from log2seq._common import load_parser_script, LogParseFailure
@@ -94,8 +96,10 @@ def main(files, parser, encoding, output, format_type, show_input,
     else:
         f_output = sys.stdout
 
-    for line in iter_lines(files, encoding=encoding):
-        if line != "":
+    try:
+        for line in iter_lines(files, encoding=encoding):
+            if line == "":
+                continue
             try:
                 buf = ""
                 if show_input:
@@ -107,6 +111,8 @@ def main(files, parser, encoding, output, format_type, show_input,
                     buf += format_parsed_statement(words, seps, format_type)
                 else:
                     pline = lp.process_line(line, verbose=verbose)
+                    if pline is None:
+                        continue
                     buf += format_parsed_line(pline, format_type)
             except LogParseFailure as e:
                 if show_input:
@@ -115,8 +121,9 @@ def main(files, parser, encoding, output, format_type, show_input,
             else:
                 if not skip_success:
                     f_output.write(buf + "\n")
-
-    f_output.close()
+    finally:
+        if output:
+            f_output.close()
 
 
 if __name__ == "__main__":
