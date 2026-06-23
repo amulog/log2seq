@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `log2seq` console-script entry point, so `log2seq ...` works after install
   (equivalent to `python -m log2seq ...`).
+- CLI options `--max-failures N` (cap the failure diagnostics printed to stderr)
+  and `--failures-only` (suppress successful results — for parser debugging).
+
+### Changed
+
+- CLI output model: successful results go to stdout (so they can be piped) while
+  parse failures and a final `# processed N lines: M ok, K failed` summary go to
+  stderr; one failing line no longer aborts the whole run. Exit status is 0 when
+  at least one line parses, 1 when nothing parses, and 2 on a startup error
+  (e.g. an unloadable parser script). **Breaking:** the CLI flags
+  `--as-statement` and `--skip-success` were renamed to `--statement` and
+  `--failures-only`.
 
 ### Fixed
 
