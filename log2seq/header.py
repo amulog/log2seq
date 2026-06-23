@@ -23,6 +23,22 @@ _KEY_MICROSECOND = "microsecond"
 _KEY_TZ = "tz"
 
 
+def _parse_tz(string):
+    """Parse a timezone token to a :class:`datetime.tzinfo`.
+
+    Accepts ``Z`` (UTC) and signed offsets ``+0900`` / ``+09:00`` / ``-06:00``
+    (with or without the colon) — the timezone forms produced by the patterns
+    of :class:`Time`, :class:`DatetimeISOFormat` and :class:`TimeZone`.
+    """
+    if string == "Z":
+        return datetime.timezone.utc
+    sign = -1 if string[0] == "-" else 1
+    digits = string[1:].replace(":", "")
+    offset = sign * datetime.timedelta(hours=int(digits[0:2]),
+                                       minutes=int(digits[2:4]))
+    return datetime.timezone(offset)
+
+
 class _HeaderParserBase(ABC):
     _date_keys = ["year", "month", "day"]
     _time_keys = ["hour", "minute", "second", "microsecond", "tzinfo"]
@@ -605,30 +621,7 @@ class Time(Item):
 
     @staticmethod
     def parse_tz(string):
-        if string == "Z":
-            return datetime.timezone.utc
-
-        # referring official _strptime.py (v3.7.2)
-        z = string.lower()
-        if z[3] == ':':
-            z = z[:3] + z[4:]
-            if len(z) > 5:
-                if z[5] != ':':
-                    raise ValueError
-                z = z[:5] + z[6:]
-        hours = int(z[1:3])
-        minutes = int(z[3:5])
-        seconds = int(z[5:7] or 0)
-        gmtoff = (hours * 60 * 60) + (minutes * 60) + seconds
-        gmtoff_remainder = z[8:]
-        gmtoff_remainder_padding = "0" * (6 - len(gmtoff_remainder))
-        gmtoff_fraction = int(gmtoff_remainder + gmtoff_remainder_padding)
-        if z.startswith("-"):
-            gmtoff = -gmtoff
-            gmtoff_fraction = -gmtoff_fraction
-        tzdelta = datetime.timedelta(seconds=gmtoff,
-                                     microseconds=gmtoff_fraction)
-        return datetime.timezone(tzdelta)
+        return _parse_tz(string)
 
 
 class DemicalSecond(Item):
@@ -670,27 +663,7 @@ class TimeZone(Item):
 
     @staticmethod
     def parse_tz(string):
-        # referring official _strptime.py (v3.7.2)
-        z = string.lower()
-        if z[3] == ':':
-            z = z[:3] + z[4:]
-            if len(z) > 5:
-                if z[5] != ':':
-                    raise ValueError
-                z = z[:5] + z[6:]
-        hours = int(z[1:3])
-        minutes = int(z[3:5])
-        seconds = int(z[5:7] or 0)
-        gmtoff = (hours * 60 * 60) + (minutes * 60) + seconds
-        gmtoff_remainder = z[8:]
-        gmtoff_remainder_padding = "0" * (6 - len(gmtoff_remainder))
-        gmtoff_fraction = int(gmtoff_remainder + gmtoff_remainder_padding)
-        if z.startswith("-"):
-            gmtoff = -gmtoff
-            gmtoff_fraction = -gmtoff_fraction
-        tzdelta = datetime.timedelta(seconds=gmtoff,
-                                     microseconds=gmtoff_fraction)
-        return datetime.timezone(tzdelta)
+        return _parse_tz(string)
 
 
 class UnixTime(Item):

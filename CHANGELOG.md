@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error lines from other modules (`mpm_event`, `ssl`, `authz_core`, ...) parse
   instead of raising `LogParseFailure`. The module name is now exposed as the
   `modulename` field.
+- `TimeZone` no longer raises a raw `IndexError` on a `Z` (UTC) offset. The
+  timezone parser is now shared between `Time` and `TimeZone`; previously it was
+  duplicated and the `TimeZone` copy had dropped the `Z` case.
 - CLI (`python -m log2seq`): read input lazily instead of `readlines()`, so
   large/compressed files no longer load entirely into memory; validate `--type`
   with `click.Choice`; and close the output file reliably (even on error).

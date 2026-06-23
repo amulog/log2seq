@@ -113,6 +113,25 @@ class TestHeader(unittest.TestCase):
         dc8 = header.DateConcat()
         assert dc8.pick_value(dc8.test("19990905")) == datetime.date(1999, 9, 5)
 
+    def test_timezone(self):
+        # Both Time and TimeZone share one tz parser. "Z" used to raise
+        # IndexError when parsed via TimeZone; it must now resolve to UTC.
+        from log2seq import header
+
+        utc = datetime.timezone.utc
+        jst = datetime.timezone(datetime.timedelta(hours=9))
+        west = datetime.timezone(datetime.timedelta(hours=-6))
+
+        tz = header.TimeZone()
+        assert tz.pick_value(tz.test("Z")) == utc
+        assert tz.pick_value(tz.test("+0900")) == jst
+        assert tz.pick_value(tz.test("+09:00")) == jst
+        assert tz.pick_value(tz.test("-06:00")) == west
+
+        assert header.Time.parse_tz("Z") == utc
+        assert header.Time.parse_tz("+0900") == jst
+        assert header.Time.parse_tz("-06:00") == west
+
     def test_items(self):
         from log2seq import header
 
