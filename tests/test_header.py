@@ -132,6 +132,20 @@ class TestHeader(unittest.TestCase):
         assert header.Time.parse_tz("+0900") == jst
         assert header.Time.parse_tz("-06:00") == west
 
+    def test_microsecond(self):
+        # fractional seconds are padded/truncated to 6 digits, integer-only.
+        from log2seq import header
+
+        ds = header.DemicalSecond()
+        assert ds.pick_value(ds.test("1")) == 100000
+        assert ds.pick_value(ds.test("012345")) == 12345
+        assert ds.pick_value(ds.test("123456")) == 123456
+        assert ds.pick_value(ds.test("1234567")) == 123456  # truncated to 6
+
+        t = header.Time()
+        assert t.pick_value(t.test("01:02:03.000001")).microsecond == 1
+        assert t.pick_value(t.test("01:02:03.5")).microsecond == 500000
+
     def test_items(self):
         from log2seq import header
 

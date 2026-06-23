@@ -39,6 +39,16 @@ def _parse_tz(string):
     return datetime.timezone(offset)
 
 
+def _parse_microsecond(string):
+    """Convert a fractional-second digit string to microseconds (0-999999).
+
+    Pads or truncates to six digits using integer arithmetic only, so the
+    result does not depend on floating-point rounding
+    (e.g. ``"1"`` -> 100000, ``"012345"`` -> 12345, ``"1234567"`` -> 123456).
+    """
+    return int((string + "000000")[:6])
+
+
 class _HeaderParserBase(ABC):
     _date_keys = ["year", "month", "day"]
     _time_keys = ["hour", "minute", "second", "microsecond", "tzinfo"]
@@ -605,10 +615,8 @@ class Time(Item):
              "second": int(mo.group(_KEY_SECOND))}
         try:
             if mo.group(cls._key_demical_second) is not None:
-                size = len(mo.group(cls._key_demical_second))
-                decimal = int(mo.group(cls._key_demical_second))
-                microsec = decimal / (10 ** size) * 10 ** 6
-                d["microsecond"] = int(microsec)
+                d["microsecond"] = _parse_microsecond(
+                    mo.group(cls._key_demical_second))
         except IndexError:
             pass
         try:
@@ -639,11 +647,7 @@ class DemicalSecond(Item):
         return r'[0-9]+'
 
     def pick_value(self, mo):
-        string = mo[self.match_name]
-        size = len(string)
-        decimal = int(string)
-        microsec = decimal / (10 ** size) * 10 ** 6
-        return int(microsec)
+        return _parse_microsecond(mo[self.match_name])
 
 
 class TimeZone(Item):
