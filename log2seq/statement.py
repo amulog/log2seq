@@ -182,10 +182,10 @@ class Fix(_ActionBase):
     """
 
     def __init__(self, patterns):
-        self._init_patterns(patterns)
+        self._l_regex = self._init_patterns(patterns)
 
     def _init_patterns(self, patterns):
-        self._l_regex = self._standard_patterns(patterns)
+        return self._standard_patterns(patterns)
 
     def _test_match_pattern(self, s):
         for reobj in self._l_regex:
@@ -530,10 +530,10 @@ class Remove(_ActionBase):
     """
 
     def __init__(self, patterns):
-        self._init_patterns(patterns)
+        self._l_regex = self._init_patterns(patterns)
 
     def _init_patterns(self, patterns):
-        self._l_regex = self._standard_patterns(patterns)
+        return self._standard_patterns(patterns)
 
     def _test_match_pattern(self, s):
         for reobj in self._l_regex:

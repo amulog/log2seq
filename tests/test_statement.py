@@ -47,6 +47,20 @@ class TestStatement(unittest.TestCase):
         l_w, l_s = sp.process_line(input_mes)
         assert l_w == ["a", "b"]
 
+    def test_fix_multiple_patterns(self):
+        # Fix with a list of patterns must protect ALL of them from later
+        # splitting. Guards the unified _init_patterns return contract: a
+        # regression there would leave _l_regex unset and fix nothing, so the
+        # MAC address below would be split on ":".
+        statement_rules = [
+            Split(" "),
+            Fix([r"\d+\.\d+\.\d+", r"([0-9a-f]{2}:){5}[0-9a-f]{2}"]),
+            Split(":")
+        ]
+        sp = StatementParser(statement_rules)
+        l_w, l_s = sp.process_line("ver 1.2.3 mac de:ad:be:ef:00:11 ok")
+        assert l_w == ["ver", "1.2.3", "mac", "de:ad:be:ef:00:11", "ok"]
+
     def test_fix_partial(self):
         input_mes = "source 192.0.2.1.80 initialized."
         statement_rules = [
