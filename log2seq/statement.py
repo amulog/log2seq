@@ -18,7 +18,7 @@ class StatementParser:
     """Parser for statement parts in log messages.
 
     Statement parts in log messages describe the event in free-format text.
-    This parser will segment the text into words and theire separators.
+    This parser will segment the text into words and their separators.
     The words are parsed as 'words' item, and the separators are
     parsed as 'symbols' item.
 
@@ -126,23 +126,10 @@ class _ActionBase(ABC):
             return [re.compile(p) for p in patterns]
 
     @staticmethod
-    def _separate_multiple_match(part, iterable_mo, label_match, label_other):
-        current = 0
-        length = len(part)
-        for mo in iterable_mo:
-            if mo.start() > current:
-                yield part[current:mo.start()], label_other
-            yield part[mo.start():mo.end()], label_match
-            current = mo.end()
-        else:
-            if current < length:
-                yield part[current:length], label_other
-
-    @staticmethod
     def _separate_partial_match(part, mo, match_groups, label_other):
         """Considering the given Match Object (mo),
         this function separates the given string (part)
-        into three string (the second string is the matching part).
+        into three strings (the second string is the matching part).
         Yields the separated string and its label (match_group name or label_other)."""
         current = 0
         length = len(part)
@@ -274,7 +261,7 @@ class _PartialActionBase(_ActionBase, ABC):
     def _separate_partial_match(part, mo, match_groups, label_other):
         """Considering the given Match Object (mo),
         this function separates the given string (part)
-        into three string (the second string is the matching part).
+        into three strings (the second string is the matching part).
         Yields the separated string and its label (match_group name or label_other)."""
         current = 0
         length = len(part)

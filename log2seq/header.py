@@ -237,7 +237,6 @@ class HeaderParser(_HeaderParserBase):
     def _duplication_check(items_to_pick):
         names = [item.match_name for item in items_to_pick]
         if len(names) > len(set(names)):
-            print(items_to_pick)
             msg = "Given items include duplicated match names"
             raise _common.ParserDefinitionError(msg)
 
@@ -561,7 +560,7 @@ class DatetimeISOFormat(Item):
 class Date(Item):
     """Item for date, including year, month, and day.
     Represented in eight-letter numeric string separated with two hyphens.
-    Similar to the formar part of DatetimeISOFormat.
+    Similar to the former part of DatetimeISOFormat.
 
     | e.g., :samp:`2112-09-03`
     """

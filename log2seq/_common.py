@@ -19,7 +19,7 @@ class ParserDefinitionError(Exception):
 
 
 class LogParseFailure(Exception):
-    """LogParserFailure is raised when the input log message
+    """LogParseFailure is raised when the input log message
     not matched with all given HeaderParser rules.
 
     If you want to pass such mismatching log messages,
@@ -40,7 +40,7 @@ class LogParser:
     * Header information (:attr:`~header.Item.value_name` as key)
     * Statement part in string format ("message" as key)
     * Segmented words in statement part ("words" as key)
-    * Separator symbols in ststement part ("symbols" as key)
+    * Separator symbols in statement part ("symbols" as key)
 
     Example:
         >>> mes = "Jan  1 12:34:56 host-device1 system[12345]: host 2001:0db8:1234::1 (interface:eth0) disconnected"
@@ -134,7 +134,7 @@ class LogParser:
         """Parse a log message (i.e., a line).
 
         If all HeaderParser fails to match the input log message,
-        it raises a LogParserFailure exception.
+        it raises a LogParseFailure exception.
 
         Args:
             line (str): A log message. Line feed code will be removed.
