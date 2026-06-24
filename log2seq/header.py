@@ -673,17 +673,30 @@ class TimeZone(Item):
 class UnixTime(Item):
     """Item for unixtime integer.
 
-    | e.g., :samp:`1551024123` for 2019-02-25 01:02:03
+    | e.g., :samp:`1551024123` for 2019-02-24 16:02:03 (UTC)
+
+    Args:
+        tz (datetime.tzinfo, optional): timezone the epoch value is resolved
+            into. Defaults to UTC so the parsed datetime does not depend on the
+            machine's local timezone. (Previously the value was resolved with
+            :func:`datetime.datetime.fromtimestamp` and no timezone, i.e. the
+            local one.) Pass e.g. ``dateutil.tz.tzlocal()`` to opt back into
+            local time explicitly.
     """
     _match_name = "unixtime"
     _value_name = _KEY_TIMESTAMP
+
+    def __init__(self, tz=datetime.timezone.utc, **kwargs):
+        super().__init__(**kwargs)
+        self._tz = tz
 
     @property
     def pattern(self):
         return r'[0-9]+'
 
     def pick_value(self, mo):
-        return datetime.datetime.fromtimestamp(int(mo.group(self._match_name)))
+        return datetime.datetime.fromtimestamp(
+            int(mo.group(self._match_name)), tz=self._tz)
 
 
 class DateConcat(Item):

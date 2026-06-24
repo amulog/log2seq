@@ -146,6 +146,18 @@ class TestHeader(unittest.TestCase):
         assert t.pick_value(t.test("01:02:03.000001")).microsecond == 1
         assert t.pick_value(t.test("01:02:03.5")).microsecond == 500000
 
+    def test_unixtime(self):
+        # default UTC -> machine-independent; an explicit tz is honored.
+        from log2seq import header
+
+        ut = header.UnixTime()
+        assert ut.pick_value(ut.test("1551024123")) == \
+            datetime.datetime(2019, 2, 24, 16, 2, 3,
+                              tzinfo=datetime.timezone.utc)
+        jst = datetime.timezone(datetime.timedelta(hours=9))
+        assert header.UnixTime(tz=jst).pick_value(ut.test("1551024123")) == \
+            datetime.datetime(2019, 2, 25, 1, 2, 3, tzinfo=jst)
+
     def test_items(self):
         from log2seq import header
 

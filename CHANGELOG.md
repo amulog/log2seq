@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fractional-second parsing (`Time` and `DemicalSecond`) uses integer-only
   arithmetic, padding/truncating to six digits, so the microsecond value no
   longer depends on floating-point rounding.
+- `UnixTime` resolves the epoch value in UTC by default (new `tz` argument)
+  instead of the machine's local timezone, so the parsed datetime is
+  deterministic. Affects only parsers that use `UnixTime` as the timestamp;
+  pass `tz=dateutil.tz.tzlocal()` to keep local time.
 - CLI (`python -m log2seq`): read input lazily instead of `readlines()`, so
   large/compressed files no longer load entirely into memory; validate `--type`
   with `click.Choice`; and close the output file reliably (even on error).
