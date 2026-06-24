@@ -21,6 +21,7 @@ _KEY_MINUTE = "minute"
 _KEY_SECOND = "second"
 _KEY_MICROSECOND = "microsecond"
 _KEY_TZ = "tz"
+_KEY_TZINFO = "tzinfo"
 
 
 def _parse_tz(string):
@@ -84,6 +85,10 @@ class _HeaderParserBase(ABC):
 
             if _KEY_TIME in ret:
                 timeobj = ret.pop(_KEY_TIME)
+                # apply a separately-extracted timezone (e.g. a TimeZone item)
+                # when the time object itself carries none
+                if _KEY_TZINFO in ret and timeobj.tzinfo is None:
+                    timeobj = timeobj.replace(tzinfo=ret.pop(_KEY_TZINFO))
             else:
                 kwargs = {}
                 for key in self._time_keys:
@@ -656,14 +661,17 @@ class TimeZone(Item):
     | e.g., :samp:`+0900`
     """
     _match_name = "timezone"
-    _value_name = _KEY_TZ
+    _value_name = _KEY_TZINFO
 
     @property
     def pattern(self):
-        return r'(?P<tz>Z|([+-](\d{2})(\:)?(\d{2})))'  # timezone
+        # No inner named group, so a TimeZone item can coexist with a Time item
+        # (whose pattern has its own "tz" group). value_name is "tzinfo" so the
+        # extracted offset is consumed by timestamp reconstruction.
+        return r'Z|[+-]\d{2}:?\d{2}'
 
     def pick_value(self, mo):
-        return self.parse_tz(mo.group(_KEY_TZ))
+        return _parse_tz(mo.group(self.match_name))
 
     @staticmethod
     def parse_tz(string):

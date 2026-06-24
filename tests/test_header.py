@@ -158,6 +158,26 @@ class TestHeader(unittest.TestCase):
         assert header.UnixTime(tz=jst).pick_value(ut.test("1551024123")) == \
             datetime.datetime(2019, 2, 25, 1, 2, 3, tzinfo=jst)
 
+    def test_separate_timezone_item(self):
+        # A standalone TimeZone item coexists with Time (no group-name clash)
+        # and its offset is applied to the timestamp (previously dropped).
+        from log2seq import header
+
+        rule = [header.Date(), header.Time(), header.TimeZone(),
+                header.Hostname("host"), header.Statement()]
+        hp = header.HeaderParser(rule, separator=" ")
+
+        jst = datetime.timezone(datetime.timedelta(hours=9))
+        r = hp.process_line("2020-05-02 11:22:33 +09:00 host the message")
+        assert r["timestamp"] == datetime.datetime(2020, 5, 2, 11, 22, 33,
+                                                   tzinfo=jst)
+        assert "tz" not in r and "tzinfo" not in r
+        assert r["host"] == "host"
+
+        r2 = hp.process_line("2020-05-02 11:22:33 Z host msg")
+        assert r2["timestamp"] == datetime.datetime(2020, 5, 2, 11, 22, 33,
+                                                    tzinfo=datetime.timezone.utc)
+
     def test_items(self):
         from log2seq import header
 

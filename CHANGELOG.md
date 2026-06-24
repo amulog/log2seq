@@ -66,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of the machine's local timezone, so the parsed datetime is
   deterministic. Affects only parsers that use `UnixTime` as the timestamp;
   pass `tz=dateutil.tz.tzlocal()` to keep local time.
+- A standalone `TimeZone` item now works in a rule alongside `Time`: it no
+  longer collides with `Time`'s internal regex group, and the extracted offset
+  is applied to the timestamp (it was written under a key that timestamp
+  reconstruction ignored, so it was silently dropped before).
 - CLI (`python -m log2seq`): read input lazily instead of `readlines()`, so
   large/compressed files no longer load entirely into memory; validate `--type`
   with `click.Choice`; and close the output file reliably (even on error).
