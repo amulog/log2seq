@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (e.g. an unloadable parser script). **Breaking:** the CLI flags
   `--as-statement` and `--skip-success` were renamed to `--statement` and
   `--failures-only`.
+- `log2seq.header` and `log2seq.statement` define `__all__`, so
+  `from log2seq.header import *` exports only the public item / action / parser
+  classes and no longer leaks stdlib names (`re`, `datetime`, `copy`, `ABC`,
+  ...). A parser script that relied on those leaked names must import them
+  explicitly (e.g. `import datetime`).
 - Packaging metadata: declare `python_requires>=3.8`, set
   `long_description_content_type="text/x-rst"` so the README renders on PyPI,
   and list Python 3.8–3.12 in the classifiers (matching the CI matrix).
