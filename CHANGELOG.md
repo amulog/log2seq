@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (e.g. an unloadable parser script). **Breaking:** the CLI flags
   `--as-statement` and `--skip-success` were renamed to `--statement` and
   `--failures-only`.
+- Packaging metadata: declare `python_requires>=3.8`, set
+  `long_description_content_type="text/x-rst"` so the README renders on PyPI,
+  and list Python 3.8–3.12 in the classifiers (matching the CI matrix).
 
 ### Fixed
 
