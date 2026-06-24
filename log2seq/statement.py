@@ -125,29 +125,6 @@ class _ActionBase(ABC):
         else:
             return [re.compile(p) for p in patterns]
 
-    @staticmethod
-    def _separate_partial_match(part, mo, match_groups, label_other):
-        """Considering the given Match Object (mo),
-        this function separates the given string (part)
-        into three strings (the second string is the matching part).
-        Yields the separated string and its label (match_group name or label_other)."""
-        current = 0
-        length = len(part)
-        sorted_match_groups = sorted(match_groups.keys(), key=lambda x: mo.start(x))
-        for match_group in sorted_match_groups:
-            label_match = match_groups[match_group]
-            if mo.start(match_group) == -1:
-                continue
-            if mo.start(match_group) < current:
-                raise ValueError("Invalid pattern with duplicated name groups")
-            if mo.start(match_group) > current:
-                yield part[current:mo.start(match_group)], label_other
-            yield part[mo.start(match_group):mo.end(match_group)], label_match
-            current = mo.end(match_group)
-        else:
-            if current < length:
-                yield part[current:length], label_other
-
 
 class Fix(_ActionBase):
     """Add Fixed flag to matched parts.
@@ -532,8 +509,8 @@ class Remove(_ActionBase):
 
     def do(self, iterable_parts):
         """Apply this action to every part.
-        Matched parts will be fixed.
-        This function works as like a filter of the statement.
+        Matched parts are removed (marked as separators) so that following
+        actions ignore them.
 
         Args:
             iterable_parts (iterator of tuple): Sequence of tuples,

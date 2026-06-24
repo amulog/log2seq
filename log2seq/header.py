@@ -186,7 +186,6 @@ class HeaderParser(_HeaderParserBase):
         [1] logparser: https://github.com/logpai/logparser
 
     """
-    _STATEMENT_FOOTER = r'(?P<' + _KEY_STATEMENT + '>.*)'
 
     def __init__(self, items, separator=None, full_format=None, **kwargs):
         super().__init__(**kwargs)
