@@ -178,6 +178,23 @@ class TestHeader(unittest.TestCase):
         assert r2["timestamp"] == datetime.datetime(2020, 5, 2, 11, 22, 33,
                                                     tzinfo=datetime.timezone.utc)
 
+    def test_optional_item_omitted_when_absent(self):
+        # An absent optional item is omitted from the result (not stored as
+        # None), so downstream "key in result" / "get(key) is not None" checks
+        # behave as expected.
+        from log2seq import header
+
+        rule = [header.MonthAbbreviation(), header.Digit("day"), header.Time(),
+                header.Hostname("host", optional=True), header.Statement()]
+        hp = header.HeaderParser(rule, full_format=r"<0> <1> <2>( <3>)?: <4>",
+                                 defaults={"year": 2020})
+
+        with_host = hp.process_line("Sep  1 01:02:03 myhost: hello")
+        assert with_host["host"] == "myhost"
+
+        without_host = hp.process_line("Sep  1 01:02:03: hello")
+        assert "host" not in without_host
+
     def test_items(self):
         from log2seq import header
 

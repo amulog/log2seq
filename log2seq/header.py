@@ -410,19 +410,18 @@ class Item(ABC):
             mo: MatchObject for combined pattern of :class:`HeaderParser`.
 
         Returns:
-            tuple: :attr:`~Item.value_name` and the value
-            extracted by :meth:`Item.pick_value`.
+            tuple: :attr:`~Item.value_name` and the value extracted by
+            :meth:`Item.pick_value`; or None when the item did not participate
+            in the match (an absent optional item, or a member of an absent
+            optional :class:`ItemGroup`). Returning None makes the caller omit
+            the key entirely rather than store it as None.
         """
-        try:
-            return self.value_name, self.pick_value(mo)
-        except TypeError:
-            # case if mo[self.match_name] is None: optional item
-            if self.optional:
-                return None
-            msg = ("Unoptional item failed to get the corresponding value. "
-                   "Don't use special characters such as ? in Item.pattern. "
-                   "If using full_format, enclose optional Item with \"()?\" manually.")
-            raise _common.ParserDefinitionError(msg)
+        # An unmatched (optional) group is None; omit it. Only call pick_value
+        # on a real value, so a genuine pick_value error is not masked as a
+        # "missing optional" the way a blanket ``except TypeError`` would.
+        if mo[self.match_name] is None:
+            return None
+        return self.value_name, self.pick_value(mo)
 
     def pick_value(self, mo):
         """Get a value from `re <https://docs.python.org/ja/3/library/re.html>`_

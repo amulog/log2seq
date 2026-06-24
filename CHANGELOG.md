@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Packaging metadata: declare `python_requires>=3.8`, set
   `long_description_content_type="text/x-rst"` so the README renders on PyPI,
   and list Python 3.8–3.12 in the classifiers (matching the CI matrix).
+- An optional header item that does not match is now omitted from the parsed
+  result dict instead of being stored as `None` (so `key in result` works for
+  optional fields such as a missing host). `Item.pick` no longer wraps value
+  extraction in a blanket `except TypeError`, so a genuine error there surfaces
+  instead of being silently treated as a missing optional.
 
 ### Fixed
 
