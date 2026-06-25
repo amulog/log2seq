@@ -31,7 +31,7 @@ setup(name=package_name,
       long_description_content_type='text/x-rst',
       author='Satoru Kobayashi',
       author_email='sat@3at.work',
-      url='https://github.com/cpflat/log2seq/',
+      url='https://github.com/amulog/log2seq/',
       classifiers=[
           'Development Status :: 4 - Beta',
           'Environment :: Console',

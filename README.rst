@@ -14,20 +14,16 @@ log2seq
    :alt: BSD 3-Clause License
    :target: https://opensource.org/licenses/BSD-3-Clause
 
-.. image:: https://travis-ci.com/amulog/log2seq.svg?branch=master
-   :alt: Travis CI
-   :target: https://travis-ci.com/github/amulog/log2seq
-
-.. image:: https://readthedocs.org/projects/log2seq/badge/?version=latest
-   :alt: Documentation Status
-   :target: https://log2seq.readthedocs.io/en/latest/?badge=latest
+.. image:: https://github.com/amulog/log2seq/actions/workflows/test.yml/badge.svg
+   :alt: Tests
+   :target: https://github.com/amulog/log2seq/actions/workflows/test.yml
 
 
 Log2seq is a python package to help parsing syslog-like messages into word sequences
 that is more suitable for further automated analysis.
 It is based on a procedure customizable with rules in order, using regular expressions.
 
-* Document: https://log2seq.readthedocs.io
+* Document: https://github.com/amulog/log2seq/wiki
 * Source: https://github.com/amulog/log2seq
 * Bug Reports: https://github.com/amulog/log2seq/issues
 * Author: `Satoru Kobayashi <https://github.com/cpflat/>`_
