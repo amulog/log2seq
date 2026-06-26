@@ -18,6 +18,10 @@ log2seq
    :alt: Tests
    :target: https://github.com/amulog/log2seq/actions/workflows/test.yml
 
+.. image:: https://img.shields.io/badge/docs-wiki-blue
+   :alt: Documentation
+   :target: https://github.com/amulog/log2seq/wiki
+
 
 Log2seq is a python package to help parsing syslog-like messages into word sequences
 that is more suitable for further automated analysis.
