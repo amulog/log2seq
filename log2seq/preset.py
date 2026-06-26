@@ -26,7 +26,8 @@ def default_header_parsers():
         * host (:class:`~log2seq.header.String`)
         * statement (:class:`~log2seq.header.Statement`)
 
-    * Rule 2 (designed for default asctime format of python logging)
+    * Rule 2 (ISO-style ``YYYY-MM-DD HH:MM:SS`` date; note that python
+      logging's asctime with comma milliseconds is not matched)
 
         * date (:class:`~log2seq.header.Date`)
         * time (:class:`~log2seq.header.Time`)
