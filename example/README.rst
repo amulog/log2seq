@@ -2,8 +2,9 @@
 log2seq Example Scripts
 ------------
 
-In this directory, there are a number of sample log2seq parser script for open datasets.
-Before checking the script, please read `documentation <https://readthedocs.org/projects/log2seq/badge/?version=latest>`_.
+This directory holds example log2seq parser scripts, one per open log dataset.
+For how they are designed and verified, see the `Example Parsers
+<https://github.com/amulog/log2seq/wiki/Example-Parsers>`_ page in the wiki.
 
 
 How to try the scripts?
@@ -11,7 +12,7 @@ How to try the scripts?
 
 ::
 
-    $ cp loghub_Android
+    $ cd loghub_Android
     $ python -m log2seq -i -p parser.py Android_2k.log
 
 
