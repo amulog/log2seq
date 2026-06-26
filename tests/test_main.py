@@ -13,7 +13,12 @@ LINES = ("Jan  1 12:34:56 host system[1]: ok one\n"
 class TestMain(unittest.TestCase):
 
     def _run(self, args, stdin):
-        runner = CliRunner(mix_stderr=False)
+        try:
+            # click < 8.2 mixes stdout/stderr unless told to keep them apart.
+            runner = CliRunner(mix_stderr=False)
+        except TypeError:
+            # click >= 8.2 removed mix_stderr; the streams are always separate.
+            runner = CliRunner()
         return runner.invoke(main, args, input=stdin)
 
     def test_stdout_stderr_split(self):
