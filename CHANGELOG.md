@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-29
+
+### Added
+
+- Official support for Python 3.13 and 3.14: added to the CI test matrix
+  (`test.yml` and `publish.yml`) and to the PyPI classifiers. log2seq is pure
+  Python with `click` as its only dependency, so no code changes were required.
+
 ## [0.4.0] - 2026-06-26
 
 ### Added
